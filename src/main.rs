@@ -1,3 +1,24 @@
+// This is used to hide the console from popping up on Windows.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+use actt::App;
+use eframe;
+use screens;
+
+// When compiling natively:
+#[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    println!("Hello, world!");
+    use egui::Vec2;
+
+    let native_options = eframe::NativeOptions {
+        min_window_size: Some(Vec2::new(300.0, 300.0)),
+        max_window_size: Some(Vec2::new(300.0, 300.0)),
+        ..Default::default()
+    };
+
+    eframe::run_native(
+        "Pomodoro Timer",
+        native_options,
+        Box::new(|cc| Box::new(App::new(cc))),
+    );
 }
