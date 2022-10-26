@@ -1,9 +1,9 @@
 // This is used to hide the console from popping up on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use actt::screens;
 use actt::App;
 use eframe;
-use screens;
 
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
@@ -17,7 +17,7 @@ fn main() {
     };
 
     eframe::run_native(
-        "Pomodoro Timer",
+        "Actt",
         native_options,
         Box::new(|cc| Box::new(App::new(cc))),
     );

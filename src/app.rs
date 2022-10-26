@@ -64,7 +64,9 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         match self.screen {
             Screen::Start => start_screen(self, ctx, _frame),
-            _ => None,
-        };
+            Screen::Tracking => tracking_screen(self, ctx, _frame),
+            Screen::Pause => pause_screen(self, ctx, _frame),
+            Screen::History => history_screen(self, ctx, _frame),
+        }
     }
 }
