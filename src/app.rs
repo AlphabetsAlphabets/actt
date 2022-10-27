@@ -1,14 +1,29 @@
-use super::screens::{Screen, *};
+#![feature(path_try_exists)]
+
+use super::screens::{Activity, Screen, *};
+
+use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    time::{Duration, Instant},
+};
+
+use dirs::config_dir;
 use egui::{Color32, RichText};
-use std::time::{Duration, Instant};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct App {
-    pub activity: String,
+    pub activity_name: String,
     pub tag: String,
 
+    #[serde(skip)]
+    pub config_file: PathBuf,
+    #[serde(skip)]
+    pub activity_history: Activity,
+    #[serde(skip)]
+    pub total_time: Duration,
     #[serde(skip)]
     pub pause_time: Duration,
     #[serde(skip)]
@@ -23,12 +38,29 @@ pub struct App {
 
 impl Default for App {
     fn default() -> Self {
+        let home = config_dir().unwrap();
+        let home = format!("{}/actt", home.display());
+        // This is ok
+        let home = Path::new(&home).to_owned();
+        if !Path::try_exists(&home).unwrap() {
+            fs::create_dir(&home).unwrap();
+        }
+
+        let config_file = format!("{}/actt.json", home.display());
+        let config_file = Path::new(&config_file);
+        if !Path::try_exists(config_file).unwrap() {
+            fs::File::create(config_file).unwrap();
+        }
+
         Self {
-            activity: "".to_string(),
+            activity_name: "".to_string(),
             tag: "".to_string(),
             warning: None,
 
             now: None,
+            config_file: config_file.to_path_buf(),
+            activity_history: Activity::default(),
+            total_time: Duration::from_secs(0),
             pause_time: Duration::from_secs(0),
             work_time: Duration::from_secs(0),
 
@@ -38,6 +70,15 @@ impl Default for App {
 }
 
 impl App {
+    pub fn read_config_file(&self) -> Option<Activity> {
+        let file = fs::read(&self.config_file).unwrap();
+        let contents = std::str::from_utf8(&file[..]).unwrap();
+        match serde_json::from_str(contents) {
+            Ok(act) => Some(act),
+            Err(_) => None,
+        }
+    }
+
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customized the look at feel of egui using
