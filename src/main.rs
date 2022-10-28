@@ -11,8 +11,7 @@ fn main() {
     use egui::Vec2;
 
     let native_options = eframe::NativeOptions {
-        min_window_size: Some(Vec2::new(300.0, 300.0)),
-        max_window_size: Some(Vec2::new(300.0, 300.0)),
+        min_window_size: Some(Vec2::new(498.0, 394.0)),
         ..Default::default()
     };
 

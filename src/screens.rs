@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::App;
-use egui::{Color32, RichText, Ui};
+use egui::{Color32, RichText, ScrollArea, Ui, Vec2};
 
 use serde::{Deserialize, Serialize};
 
@@ -38,7 +38,7 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
         ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
             ui.heading("History");
             match &app.warning {
-                None => ui.label("\n\n\n"),
+                None => ui.label("\r"),
                 Some(msg) => {
                     let msg = format!("\n{}\n", msg);
                     ui.label(msg)
@@ -48,19 +48,50 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
             ui.label("A history of all your activities, and how long you've spent on each one!");
             ui.separator();
 
-            match app.read_config_file() {
-                Some(act) => {
-                    for (index, name) in act.name.iter().enumerate() {
-                        let tag = &act.tag[index];
-                        let total_time = &act.total_time[index];
+            let act = match app.read_config_file() {
+                Some(act) => act,
+                None => Activity::default(),
+            };
 
-                        let msg = format!("{} | @{} | {}s", name, tag, total_time.as_secs());
-                        ui.label(msg);
-                    }
-                }
-                None => {
-                    ui.label("It's empty!");
-                }
+            if act.name.len() == 0 {
+                ui.label("It's empty!");
+            } else {
+                let scroll_area = ScrollArea::vertical().auto_shrink([false; 2]);
+                scroll_area.show(ui, |ui| {
+                    ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                        ui.columns(4, |column| {
+                            let blue_text =
+                                |text: &str| RichText::new(text).color(Color32::LIGHT_BLUE);
+
+                            column[0].vertical_centered_justified(|ui| ui.label(blue_text("Name")));
+                            column[1].vertical_centered_justified(|ui| ui.label(blue_text("Tag")));
+                            column[2].vertical_centered_justified(|ui| {
+                                ui.label(blue_text("Time spent"))
+                            });
+                            column[3]
+                                .vertical_centered_justified(|ui| ui.label(blue_text("Delete")));
+                        });
+
+                        for (index, name) in act.name.iter().enumerate() {
+                            ui.columns(4, |column| {
+                                let tag = &act.tag[index];
+                                let total_time = &act.total_time[index].as_secs();
+
+                                column[0].vertical_centered_justified(|ui| ui.label(name));
+                                column[1].vertical_centered_justified(|ui| ui.label(tag));
+
+                                let total_time = if *total_time < 60 {
+                                    format!("{}s", total_time)
+                                } else {
+                                    format!("{}m", total_time)
+                                };
+
+                                column[2].vertical_centered_justified(|ui| ui.label(total_time));
+                                column[3].vertical_centered_justified(|ui| ui.button("X"));
+                            });
+                        }
+                    });
+                });
             }
         });
     });
@@ -81,18 +112,29 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                 }
             };
 
-            ui.horizontal(|ui| {
-                ui.label("Activity");
-                ui.text_edit_singleline(&mut app.activity_name)
-                    .on_hover_text("What do you want to track?");
-            });
+            ui.allocate_ui_with_layout(
+                Vec2::new(200.0, 200.0),
+                egui::Layout::top_down(egui::Align::Center),
+                |ui| {
+                    ui.columns(2, |column| {
+                        column[0].vertical_centered_justified(|ui| ui.label("Activity"));
+                        column[1].vertical_centered_justified(|ui| {
+                            ui.text_edit_singleline(&mut app.activity_name)
+                                .on_hover_text("What do you want to track?")
+                        });
+                    });
 
-            ui.horizontal(|ui| {
-                ui.label("Tag       ");
-                ui.text_edit_singleline(&mut app.tag)
-                    .on_hover_text("What category is this activity under?");
-            });
+                    ui.columns(2, |column| {
+                        column[0].vertical_centered_justified(|ui| ui.label("Tag"));
+                        column[1].vertical_centered_justified(|ui| {
+                            ui.text_edit_singleline(&mut app.tag)
+                                .on_hover_text("What category is this activity under?")
+                        });
+                    });
+                },
+            );
 
+            ui.label("\n");
             if ui.button("Start").clicked() {
                 if app.activity_name.len() <= 0 {
                     app.warning = Some("Activity cannot be empty!".to_string());
