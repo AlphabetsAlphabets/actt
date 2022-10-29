@@ -1,5 +1,3 @@
-#![feature(path_try_exists)]
-
 use super::screens::{Activity, Screen, *};
 
 use std::path::{Path, PathBuf};
@@ -9,7 +7,6 @@ use std::{
 };
 
 use dirs::config_dir;
-use egui::{Color32, RichText};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -24,8 +21,6 @@ pub struct App {
     pub activity_history: Activity,
     #[serde(skip)]
     pub total_time: Duration,
-    #[serde(skip)]
-    pub pause_time: Duration,
     #[serde(skip)]
     pub now: Option<Instant>,
     #[serde(skip)]
@@ -61,7 +56,6 @@ impl Default for App {
             config_file: config_file.to_path_buf(),
             activity_history: Activity::default(),
             total_time: Duration::from_secs(0),
-            pause_time: Duration::from_secs(0),
             work_time: Duration::from_secs(0),
 
             screen: Screen::Start,
@@ -70,6 +64,10 @@ impl Default for App {
 }
 
 impl App {
+    pub fn write_config_file(&self) {
+        let json = serde_json::to_string(&self.activity_history).unwrap();
+        fs::write(&self.config_file, json).unwrap();
+    }
     pub fn read_config_file(&self) -> Option<Activity> {
         let file = fs::read(&self.config_file).unwrap();
         let contents = std::str::from_utf8(&file[..]).unwrap();
@@ -105,8 +103,7 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         match self.screen {
             Screen::Start => start_screen(self, ctx, _frame),
-            Screen::Tracking => tracking_screen(self, ctx, _frame),
-            Screen::Pause => pause_screen(self, ctx, _frame),
+            Screen::Tracking | Screen::Pause => tracking_screen(self, ctx, _frame),
             Screen::History => history_screen(self, ctx, _frame),
         }
     }
