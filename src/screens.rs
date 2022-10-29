@@ -100,13 +100,14 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
                                             || total_time.len() != 0
                                             || tag.len() != 0
                                         {
+                                            // println!("Name: {} ({})", &name[index], index);
                                             name.remove(index);
                                             total_time.remove(index);
                                             tag.remove(index);
                                             ctx.request_repaint();
-                                        }
 
-                                        app.write_config_file();
+                                            app.write_config_file();
+                                        }
                                     }
                                 });
                             });
