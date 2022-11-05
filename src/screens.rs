@@ -1,8 +1,4 @@
-use std::{
-    cmp::{max, min},
-    fs,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use crate::App;
 use egui::{Color32, RichText, ScrollArea, Ui, Vec2};
@@ -64,13 +60,16 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
                             let blue_text =
                                 |text: &str| RichText::new(text).color(Color32::LIGHT_BLUE);
 
+                            let red_text =
+                                |text: &str| RichText::new(text).color(Color32::LIGHT_RED);
+
                             column[0].vertical_centered_justified(|ui| ui.label(blue_text("Name")));
                             column[1].vertical_centered_justified(|ui| ui.label(blue_text("Tag")));
                             column[2].vertical_centered_justified(|ui| {
                                 ui.label(blue_text("Time spent"))
                             });
                             column[3]
-                                .vertical_centered_justified(|ui| ui.label(blue_text("Delete")));
+                                .vertical_centered_justified(|ui| ui.label(red_text("Delete")));
                         });
 
                         for (index, name) in act.name.iter().enumerate() {
@@ -90,24 +89,25 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
                                 column[2].vertical_centered_justified(|ui| ui.label(total_time));
                                 column[3].vertical_centered_justified(|ui| {
                                     if ui.button("X").clicked() {
+                                        match app.read_config_file() {
+                                            Some(act) => {
+                                                app.activity_history = act;
+                                            }
+                                            _ => {}
+                                        };
+
                                         let Activity {
                                             name,
                                             total_time,
                                             tag,
                                         } = &mut app.activity_history;
 
-                                        if name.len() != 0
-                                            || total_time.len() != 0
-                                            || tag.len() != 0
-                                        {
-                                            // println!("Name: {} ({})", &name[index], index);
-                                            name.remove(index);
-                                            total_time.remove(index);
-                                            tag.remove(index);
-                                            ctx.request_repaint();
+                                        name.remove(index);
+                                        total_time.remove(index);
+                                        tag.remove(index);
+                                        ctx.request_repaint();
 
-                                            app.write_config_file();
-                                        }
+                                        app.write_config_file();
                                     }
                                 });
                             });
@@ -184,13 +184,7 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                 }
             };
 
-            let mut now = app.now.unwrap().elapsed().as_secs();
-            let total_time = app.total_time.as_secs();
-            if total_time == 0 {
-                app.total_time = Duration::from_secs(now);
-            } else {
-                app.total_time += Duration::from_secs(now);
-            }
+            let now = app.now.unwrap().elapsed().as_secs();
 
             match app.screen {
                 Screen::Pause => {
@@ -198,9 +192,9 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                 }
                 _ => {
                     let header = if now < 60 {
-                        format!("{}s", app.total_time.as_secs())
+                        format!("{}s", now)
                     } else {
-                        format!("{}m", app.total_time.as_secs() / 60)
+                        format!("{}m", now / 60)
                     };
 
                     ctx.request_repaint();
@@ -213,19 +207,21 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
             ui.columns(2, |columns| {
                 if columns[0].button("Stop").clicked() {
                     app.screen = Screen::History;
-                    app.total_time = Duration::from_secs(now);
+                    if app.total_work_time.is_zero() {
+                        app.total_work_time = Duration::from_secs(now);
+                    }
 
                     app.activity_history = match app.read_config_file() {
                         Some(mut act) => {
                             act.name.push(app.activity_name.clone());
-                            act.total_time.push(app.total_time);
+                            act.total_time.push(app.total_work_time);
                             act.tag.push(app.tag.clone());
 
                             act
                         }
                         None => Activity {
                             name: vec![app.activity_name.clone()],
-                            total_time: vec![app.total_time],
+                            total_time: vec![app.total_work_time],
                             tag: vec![app.tag.clone()],
                         },
                     };
@@ -239,15 +235,12 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                     Screen::Pause => {
                         if columns[1].button("Resume").clicked() {
                             app.screen = Screen::Tracking;
-                            app.now = Some(Instant::now());
                         }
                     }
                     _ => {
                         if columns[1].button("Pause").clicked() {
                             app.screen = Screen::Pause;
-                            let work_time = app.work_time.as_secs();
-                            app.work_time =
-                                Duration::from_secs(max(work_time, now) - min(work_time, now));
+                            app.pause_time = Some(Instant::now());
                         }
                     }
                 }

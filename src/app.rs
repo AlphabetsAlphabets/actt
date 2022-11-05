@@ -16,11 +16,13 @@ pub struct App {
     pub tag: String,
 
     #[serde(skip)]
+    pub pause_time: Option<Instant>,
+    #[serde(skip)]
     pub config_file: PathBuf,
     #[serde(skip)]
     pub activity_history: Activity,
     #[serde(skip)]
-    pub total_time: Duration,
+    pub total_work_time: Duration,
     #[serde(skip)]
     pub now: Option<Instant>,
     #[serde(skip)]
@@ -55,7 +57,8 @@ impl Default for App {
             now: None,
             config_file: config_file.to_path_buf(),
             activity_history: Activity::default(),
-            total_time: Duration::from_secs(0),
+            pause_time: None,
+            total_work_time: Duration::from_secs(0),
             work_time: Duration::from_secs(0),
 
             screen: Screen::Start,
@@ -68,6 +71,7 @@ impl App {
         let json = serde_json::to_string(&self.activity_history).unwrap();
         fs::write(&self.config_file, json).unwrap();
     }
+
     pub fn read_config_file(&self) -> Option<Activity> {
         let file = fs::read(&self.config_file).unwrap();
         let contents = std::str::from_utf8(&file[..]).unwrap();
