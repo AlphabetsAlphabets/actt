@@ -22,9 +22,11 @@ pub struct App {
     #[serde(skip)]
     pub activity_history: Activity,
     #[serde(skip)]
+    pub total_pause_time: Duration,
+    #[serde(skip)]
     pub total_work_time: Duration,
     #[serde(skip)]
-    pub now: Option<Instant>,
+    pub total_time: Option<Instant>,
     #[serde(skip)]
     pub work_time: Duration,
     #[serde(skip)]
@@ -54,10 +56,11 @@ impl Default for App {
             tag: "".to_string(),
             warning: None,
 
-            now: None,
+            total_time: None,
             config_file: config_file.to_path_buf(),
             activity_history: Activity::default(),
             pause_time: None,
+            total_pause_time: Duration::from_secs(0),
             total_work_time: Duration::from_secs(0),
             work_time: Duration::from_secs(0),
 
