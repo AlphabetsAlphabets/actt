@@ -24,8 +24,6 @@ pub struct App {
     #[serde(skip)]
     pub total_pause_time: Duration,
     #[serde(skip)]
-    pub total_work_time: Duration,
-    #[serde(skip)]
     pub total_time: Option<Instant>,
     #[serde(skip)]
     pub work_time: Duration,
@@ -61,7 +59,6 @@ impl Default for App {
             activity_history: Activity::default(),
             pause_time: None,
             total_pause_time: Duration::from_secs(0),
-            total_work_time: Duration::from_secs(0),
             work_time: Duration::from_secs(0),
 
             screen: Screen::Start,

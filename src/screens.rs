@@ -189,25 +189,23 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
 
             let total_time = match app.pause_time {
                 Some(pause_time) => {
-                    // Time doesn't update after this.
-                    let App {
-                        total_time,
-                        total_pause_time,
-                        ..
-                    } = app;
+                    // The pause time increases, which is supposed to happen.
+                    // This meaures the amount of time passed since
+                    // total_time and pause_time was made
+                    // 5 = total_time
+                    // 20 = pause_time
+                    // time passed = 15
+                    //
+                    // 30 = pause_time
+                    // time passed = 30 - 5 = 25
+                    //
+                    // 10 seconds has been increased to the total pause time... But what do I do
+                    //    with it?
 
-                    let pause_time = pause_time.elapsed();
-                    let total_time = total_time.unwrap().elapsed();
-
-                    if *total_pause_time < pause_time {
-                        *total_pause_time = pause_time;
-                    }
-
-                    let diff = *total_pause_time - pause_time;
-                    *total_pause_time += diff;
-                    app.work_time = total_time - *total_pause_time;
-
-                    app.work_time.as_secs()
+                    // this should be a measure of how much you worked minus the amount of
+                    // time spent paused. But, it ends up displaying total time I've been working
+                    // on instead of the time you worked on minus the pause.
+                    pause_time.duration_since(app.total_time.unwrap()).as_secs()
                 }
                 None => app.total_time.unwrap().elapsed().as_secs(),
             };
@@ -237,7 +235,7 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                     app.activity_history = match app.read_config_file() {
                         Some(mut act) => {
                             act.name.push(app.activity_name.clone());
-                            act.total_time.push(app.work_time);
+                            act.total_time.push(app.total_time.unwrap().elapsed());
                             act.tag.push(app.tag.clone());
 
                             act
@@ -260,12 +258,20 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                     Screen::Pause => {
                         if columns[1].button("Resume").clicked() {
                             app.screen = Screen::Tracking;
+                            app.pause_time = None;
                         }
                     }
                     _ => {
                         if columns[1].button("Pause").clicked() {
                             app.screen = Screen::Pause;
-                            app.pause_time = Some(Instant::now());
+                            match app.pause_time {
+                                Some(pause_time) => {
+                                    app.total_time =
+                                        Some(app.total_time.unwrap() + pause_time.elapsed());
+                                    app.pause_time = None;
+                                }
+                                None => app.pause_time = Some(Instant::now()),
+                            };
                         }
                     }
                 }
