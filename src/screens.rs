@@ -83,11 +83,12 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
                                 column[0].vertical_centered_justified(|ui| ui.label(name));
                                 column[1].vertical_centered_justified(|ui| ui.label(tag));
 
-                                let total_time = if *total_time < 60 {
-                                    format!("{}s", total_time)
-                                } else {
-                                    format!("{}m", total_time)
-                                };
+                                let m = total_time / 60;
+                                let s = total_time % 60;
+                                let h = m / 60;
+                                let m = m % 60;
+
+                                let total_time = format!("{}h {}m {}s", h, m, s);
 
                                 column[2].vertical_centered_justified(|ui| ui.label(total_time));
                                 column[3].vertical_centered_justified(|ui| {
@@ -159,6 +160,23 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                 },
             );
 
+            #[derive(Debug, PartialEq)]
+            enum Enum {
+                First,
+                Second,
+                Third,
+            }
+
+            let mut selected = Enum::First;
+
+            egui::ComboBox::from_label("Select one!")
+                .selected_text(format!("{:?}", selected))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut selected, Enum::First, "First");
+                    ui.selectable_value(&mut selected, Enum::Second, "Second");
+                    ui.selectable_value(&mut selected, Enum::Third, "Third");
+                });
+
             ui.label("\n");
             if ui.button("Start").clicked() {
                 if app.activity_name.len() <= 0 {
@@ -187,40 +205,23 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                 }
             };
 
-            let total_time = match app.pause_time {
-                Some(pause_time) => {
-                    // The pause time increases, which is supposed to happen.
-                    // This meaures the amount of time passed since
-                    // total_time and pause_time was made
-                    // 5 = total_time
-                    // 20 = pause_time
-                    // time passed = 15
-                    //
-                    // 30 = pause_time
-                    // time passed = 30 - 5 = 25
-                    //
-                    // 10 seconds has been increased to the total pause time... But what do I do
-                    //    with it?
-
-                    // this should be a measure of how much you worked minus the amount of
-                    // time spent paused. But, it ends up displaying total time I've been working
-                    // on instead of the time you worked on minus the pause.
-                    pause_time.duration_since(app.total_time.unwrap()).as_secs()
-                }
+            let total_time: u64 = match app.pause_time {
+                Some(pause_time) => pause_time.duration_since(app.total_time.unwrap()).as_secs(),
                 None => app.total_time.unwrap().elapsed().as_secs(),
             };
 
+            // 5741s
+            let m = total_time / 60;
+            let s = total_time % 60;
+            let h = m / 60;
+            let m = m % 60;
+
+            let header = format!("{}h {}m {}s", h, m, s);
             match app.screen {
                 Screen::Pause => {
                     ui.heading("Paused");
                 }
                 _ => {
-                    let header = if total_time < 60 {
-                        format!("{}s", total_time)
-                    } else {
-                        format!("{}m", total_time / 60)
-                    };
-
                     ctx.request_repaint();
                     ui.heading(header);
                 }
@@ -231,6 +232,12 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
             ui.columns(2, |columns| {
                 if columns[0].button("Stop").clicked() {
                     app.screen = Screen::History;
+                    match app.pause_time {
+                        Some(pause_time) => {
+                            app.total_time = Some(app.total_time.unwrap() + pause_time.elapsed());
+                        }
+                        _ => (),
+                    }
 
                     app.activity_history = match app.read_config_file() {
                         Some(mut act) => {
@@ -258,6 +265,8 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                     Screen::Pause => {
                         if columns[1].button("Resume").clicked() {
                             app.screen = Screen::Tracking;
+                            app.total_time =
+                                Some(app.total_time.unwrap() + app.pause_time.unwrap().elapsed());
                             app.pause_time = None;
                         }
                     }
@@ -265,11 +274,7 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                         if columns[1].button("Pause").clicked() {
                             app.screen = Screen::Pause;
                             match app.pause_time {
-                                Some(pause_time) => {
-                                    app.total_time =
-                                        Some(app.total_time.unwrap() + pause_time.elapsed());
-                                    app.pause_time = None;
-                                }
+                                Some(_) => app.pause_time = None,
                                 None => app.pause_time = Some(Instant::now()),
                             };
                         }
