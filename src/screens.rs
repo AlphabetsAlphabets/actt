@@ -1,7 +1,4 @@
-use std::{
-    cmp::{max, min},
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use crate::App;
 use egui::{Color32, RichText, ScrollArea, Ui, Vec2};
@@ -48,10 +45,7 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
             ui.label("A history of all your activities, and how long you've spent on each one!");
             ui.separator();
 
-            let act = match app.read_config_file() {
-                Some(act) => act,
-                None => Activity::default(),
-            };
+            let act = app.read_config_file();
 
             if act.name.len() == 0 {
                 ui.label("It's empty!");
@@ -93,12 +87,7 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
                                 column[2].vertical_centered_justified(|ui| ui.label(total_time));
                                 column[3].vertical_centered_justified(|ui| {
                                     if ui.button("X").clicked() {
-                                        match app.read_config_file() {
-                                            Some(act) => {
-                                                app.activity_history = act;
-                                            }
-                                            _ => {}
-                                        };
+                                        app.activity_history = app.read_config_file();
 
                                         let Activity {
                                             name,
@@ -153,34 +142,20 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                     ui.columns(2, |column| {
                         column[0].vertical_centered_justified(|ui| ui.label("Tag"));
                         column[1].vertical_centered_justified(|ui| {
-                            ui.text_edit_singleline(&mut app.tag)
-                                .on_hover_text("What category is this activity under?")
+                            ui.text_edit_singleline(&mut app.tag).on_hover_text(
+                                "What category does the activity belong too?".to_string(),
+                            )
                         });
                     });
                 },
             );
 
-            #[derive(Debug, PartialEq)]
-            enum Enum {
-                First,
-                Second,
-                Third,
-            }
-
-            let mut selected = Enum::First;
-
-            egui::ComboBox::from_label("Select one!")
-                .selected_text(format!("{:?}", selected))
-                .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut selected, Enum::First, "First");
-                    ui.selectable_value(&mut selected, Enum::Second, "Second");
-                    ui.selectable_value(&mut selected, Enum::Third, "Third");
-                });
-
             ui.label("\n");
             if ui.button("Start").clicked() {
                 if app.activity_name.len() <= 0 {
                     app.warning = Some("Activity cannot be empty!".to_string());
+                } else if app.tag.len() == 0 {
+                    app.warning = Some("Tag cannot be empty!".to_string());
                 } else {
                     app.warning = None;
                     app.screen = Screen::Tracking;
@@ -239,21 +214,18 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                         _ => (),
                     }
 
-                    app.activity_history = match app.read_config_file() {
-                        Some(mut act) => {
-                            act.name.push(app.activity_name.clone());
-                            act.total_time.push(app.total_time.unwrap().elapsed());
-                            act.tag.push(app.tag.clone());
+                    let mut act = app.read_config_file();
+                    if act.name.len() == 0 {
+                        act.name = vec![app.activity_name.clone()];
+                        act.total_time = vec![app.work_time];
+                        act.tag = vec![app.tag.clone()];
+                    } else {
+                        act.name.push(app.activity_name.clone());
+                        act.total_time.push(app.total_time.unwrap().elapsed());
+                        act.tag.push(app.tag.clone());
+                    }
 
-                            act
-                        }
-                        None => Activity {
-                            name: vec![app.activity_name.clone()],
-                            total_time: vec![app.work_time],
-                            tag: vec![app.tag.clone()],
-                        },
-                    };
-
+                    app.activity_history = act;
                     app.write_config_file();
 
                     app.pause_time = None;

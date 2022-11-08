@@ -25,6 +25,7 @@ dependencies = [
  "dirs",
  "eframe",
  "egui",
+ "egui-dropdown",
  "image",
  "serde",
  "serde_json",
@@ -547,6 +548,15 @@ dependencies = [
  "ron",
  "serde",
  "tracing",
+]
+
+[[package]]
+name = "egui-dropdown"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "89f87401725e6cc428b68b2b1934448d289a09c0691b0169794c3f7753b3553f"
+dependencies = [
+ "egui",
 ]
 
 [[package]]
