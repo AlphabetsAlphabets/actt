@@ -80,7 +80,6 @@ impl App {
             Err(_) => Activity::default(),
         }
     }
-
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customized the look at feel of egui using
