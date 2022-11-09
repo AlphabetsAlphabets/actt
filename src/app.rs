@@ -14,6 +14,7 @@ use dirs::config_dir;
 pub struct App {
     pub activity_name: String,
     pub tag: String,
+    pub buf: String,
 
     #[serde(skip)]
     pub pause_time: Option<Instant>,
@@ -52,6 +53,7 @@ impl Default for App {
         Self {
             activity_name: "".to_string(),
             tag: "".to_string(),
+            buf: "".to_string(),
             warning: None,
 
             total_time: None,

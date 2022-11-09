@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 use crate::App;
 use egui::{Color32, RichText, ScrollArea, Ui, Vec2};
 
+use egui_dropdown::DropDownBox;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Default)]
@@ -50,63 +51,7 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
             if act.name.len() == 0 {
                 ui.label("It's empty!");
             } else {
-                let scroll_area = ScrollArea::vertical().auto_shrink([false; 2]);
-                scroll_area.show(ui, |ui| {
-                    ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
-                        ui.columns(4, |column| {
-                            let blue_text =
-                                |text: &str| RichText::new(text).color(Color32::LIGHT_BLUE);
-
-                            let red_text =
-                                |text: &str| RichText::new(text).color(Color32::LIGHT_RED);
-
-                            column[0].vertical_centered_justified(|ui| ui.label(blue_text("Name")));
-                            column[1].vertical_centered_justified(|ui| ui.label(blue_text("Tag")));
-                            column[2].vertical_centered_justified(|ui| {
-                                ui.label(blue_text("Time spent"))
-                            });
-                            column[3]
-                                .vertical_centered_justified(|ui| ui.label(red_text("Delete")));
-                        });
-
-                        for (index, name) in act.name.iter().enumerate() {
-                            ui.columns(4, |column| {
-                                let tag = &act.tag[index];
-                                let total_time = &act.total_time[index].as_secs();
-
-                                column[0].vertical_centered_justified(|ui| ui.label(name));
-                                column[1].vertical_centered_justified(|ui| ui.label(tag));
-
-                                let m = total_time / 60;
-                                let s = total_time % 60;
-                                let h = m / 60;
-                                let m = m % 60;
-
-                                let total_time = format!("{}h {}m {}s", h, m, s);
-
-                                column[2].vertical_centered_justified(|ui| ui.label(total_time));
-                                column[3].vertical_centered_justified(|ui| {
-                                    if ui.button("X").clicked() {
-                                        app.activity_history = app.read_config_file();
-
-                                        let Activity {
-                                            name,
-                                            total_time,
-                                            tag,
-                                        } = &mut app.activity_history;
-
-                                        name.remove(index);
-                                        total_time.remove(index);
-                                        tag.remove(index);
-                                        ctx.request_repaint();
-
-                                        app.write_config_file();
-                                    }
-                                });
-                            });
-                        }
-                    });
-                });
+                activity_scroll(app, act, ctx, _frame, ui);
             }
         });
     });
@@ -142,29 +87,28 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                     ui.columns(2, |column| {
                         column[0].vertical_centered_justified(|ui| ui.label("Tag"));
                         column[1].vertical_centered_justified(|ui| {
-                            ui.text_edit_singleline(&mut app.tag)
-                                .on_hover_text("What category is this activity under?")
+                            let mut prev = "".to_string();
+                            let tags = &app.activity_history.tag;
+                            let mut display = vec![];
+                            for tag in tags {
+                                if *tag != prev {
+                                    display.push(tag);
+                                }
+
+                                prev = tag.clone();
+                            }
+
+                            ui.add(DropDownBox::from_iter(
+                                &display,
+                                "tags",
+                                &mut app.tag,
+                                |ui, text| ui.selectable_label(false, text),
+                            ))
+                            .on_hover_text("What category is this activity under?");
                         });
                     });
                 },
             );
-
-            #[derive(Debug, PartialEq)]
-            enum Enum {
-                First,
-                Second,
-                Third,
-            }
-
-            let mut selected = Enum::First;
-
-            egui::ComboBox::from_label("Select one!")
-                .selected_text(format!("{:?}", selected))
-                .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut selected, Enum::First, "First");
-                    ui.selectable_value(&mut selected, Enum::Second, "Second");
-                    ui.selectable_value(&mut selected, Enum::Third, "Third");
-                });
 
             ui.label("\n");
             if ui.button("Start").clicked() {
@@ -231,7 +175,7 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                     let mut act = app.read_config_file();
                     if act.name.len() == 0 {
                         act.name = vec![app.activity_name.clone()];
-                        act.total_time = vec![app.work_time];
+                        act.total_time = vec![app.total_time.unwrap().elapsed()];
                         act.tag = vec![app.tag.clone()];
                     } else {
                         act.name.push(app.activity_name.clone());
@@ -267,6 +211,67 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                     }
                 }
             });
+        });
+    });
+}
+
+fn activity_scroll(
+    app: &mut App,
+    act: Activity,
+    ctx: &egui::Context,
+    _frame: &mut eframe::Frame,
+    ui: &mut Ui,
+) {
+    let scroll_area = ScrollArea::vertical().auto_shrink([false; 2]);
+    scroll_area.show(ui, |ui| {
+        ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+            ui.columns(4, |column| {
+                let blue_text = |text: &str| RichText::new(text).color(Color32::LIGHT_BLUE);
+
+                let red_text = |text: &str| RichText::new(text).color(Color32::LIGHT_RED);
+
+                column[0].vertical_centered_justified(|ui| ui.label(blue_text("Name")));
+                column[1].vertical_centered_justified(|ui| ui.label(blue_text("Tag")));
+                column[2].vertical_centered_justified(|ui| ui.label(blue_text("Time spent")));
+                column[3].vertical_centered_justified(|ui| ui.label(red_text("Delete")));
+            });
+
+            for (index, name) in act.name.iter().enumerate() {
+                ui.columns(4, |column| {
+                    let tag = &act.tag[index];
+                    let total_time = &act.total_time[index].as_secs();
+
+                    column[0].vertical_centered_justified(|ui| ui.label(name));
+                    column[1].vertical_centered_justified(|ui| ui.label(tag));
+
+                    let m = total_time / 60;
+                    let s = total_time % 60;
+                    let h = m / 60;
+                    let m = m % 60;
+
+                    let total_time = format!("{}h {}m {}s", h, m, s);
+
+                    column[2].vertical_centered_justified(|ui| ui.label(total_time));
+                    column[3].vertical_centered_justified(|ui| {
+                        if ui.button("X").clicked() {
+                            app.activity_history = app.read_config_file();
+
+                            let Activity {
+                                name,
+                                total_time,
+                                tag,
+                            } = &mut app.activity_history;
+
+                            name.remove(index);
+                            total_time.remove(index);
+                            tag.remove(index);
+                            ctx.request_repaint();
+
+                            app.write_config_file();
+                        }
+                    });
+                });
+            }
         });
     });
 }

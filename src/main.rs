@@ -1,6 +1,6 @@
 // This is used to hide the console from popping up on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-#![feature(path_try_exists)]
+#![feature(drain_filter)]
 
 use actt::screens;
 use actt::App;
