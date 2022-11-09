@@ -9,7 +9,29 @@ use serde::{Deserialize, Serialize};
 pub struct Activity {
     name: Vec<String>,
     total_time: Vec<Duration>,
-    tag: Vec<String>,
+    tag_index: Vec<String>,
+    user_gen_tag: Vec<String>,
+}
+
+impl Activity {
+    pub fn insert_tag(&mut self, new_tag: String) -> bool {
+        let Self {
+            tag_index,
+            user_gen_tag,
+            ..
+        } = self;
+
+        if user_gen_tag.contains(&new_tag) {
+            false
+        } else {
+            // TODO: Warn user when they have reached max number of tags.
+            let new_index = tag_index.len().saturating_sub(1);
+            self.tag_index.push(new_index.to_string());
+            self.user_gen_tag.push(new_tag);
+
+            true
+        }
+    }
 }
 
 #[derive(PartialEq)]
@@ -71,11 +93,12 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
 
                         for (index, name) in act.name.iter().enumerate() {
                             ui.columns(4, |column| {
-                                let tag = &act.tag[index];
+                                let user_gen_tag = &act.user_gen_tag[index];
+
                                 let total_time = &act.total_time[index].as_secs();
 
                                 column[0].vertical_centered_justified(|ui| ui.label(name));
-                                column[1].vertical_centered_justified(|ui| ui.label(tag));
+                                column[1].vertical_centered_justified(|ui| ui.label(user_gen_tag));
 
                                 let m = total_time / 60;
                                 let s = total_time % 60;
@@ -92,7 +115,8 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
                                         let Activity {
                                             name,
                                             total_time,
-                                            tag,
+                                            tag_index: tag,
+                                            ..
                                         } = &mut app.activity_history;
 
                                         name.remove(index);
@@ -154,8 +178,6 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
             if ui.button("Start").clicked() {
                 if app.activity_name.len() <= 0 {
                     app.warning = Some("Activity cannot be empty!".to_string());
-                } else if app.tag.len() == 0 {
-                    app.warning = Some("Tag cannot be empty!".to_string());
                 } else {
                     app.warning = None;
                     app.screen = Screen::Tracking;
@@ -218,11 +240,11 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                     if act.name.len() == 0 {
                         act.name = vec![app.activity_name.clone()];
                         act.total_time = vec![app.work_time];
-                        act.tag = vec![app.tag.clone()];
+                        act.insert_tag(app.tag.clone());
                     } else {
                         act.name.push(app.activity_name.clone());
                         act.total_time.push(app.total_time.unwrap().elapsed());
-                        act.tag.push(app.tag.clone());
+                        act.insert_tag(app.tag.clone());
                     }
 
                     app.activity_history = act;
