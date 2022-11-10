@@ -17,6 +17,8 @@ pub struct App {
     pub buf: String,
 
     #[serde(skip)]
+    pub show_tag_assign_dialog: bool,
+    #[serde(skip)]
     pub pause_time: Option<Instant>,
     #[serde(skip)]
     pub config_file: PathBuf,
@@ -62,6 +64,8 @@ impl Default for App {
             pause_time: None,
             total_pause_time: Duration::from_secs(0),
             work_time: Duration::from_secs(0),
+
+            show_tag_assign_dialog: false,
 
             screen: Screen::Start,
         }

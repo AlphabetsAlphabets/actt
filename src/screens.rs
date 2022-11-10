@@ -261,18 +261,39 @@ fn activity_scroll(
 
             for (index, name) in act.name.iter().enumerate() {
                 ui.columns(4, |column| {
-                    let tag = act.tag[index].clone();
+                    let mut tag = act.tag[index].clone();
                     let total_time = &act.total_time[index].as_secs();
 
                     column[0].vertical_centered_justified(|ui| ui.label(name));
                     column[1].vertical_centered_justified(|ui| {
                         if tag == "  " {
-                            let tag = " ".to_string();
                             let btn = egui::Button::new(tag.clone()).frame(false);
                             let btn = ui.add(btn).on_hover_text("Double click to assign tag.");
 
                             if btn.double_clicked() {
-                                println!("Assign tag.");
+                                app.show_tag_assign_dialog = true;
+                                if app.show_tag_assign_dialog {
+                                    egui::Window::new("Assign tag")
+                                        .collapsible(false)
+                                        .resizable(false)
+                                        .show(ctx, |ui| {
+                                            ui.horizontal(|ui| {
+                                                ui.text_edit_singleline(&mut tag);
+
+                                                if ui.button("Assign").clicked() {
+                                                    act.tag[index] = tag.clone();
+                                                    app.activity_history.tag[index] = tag;
+                                                    app.write_config_file();
+
+                                                    app.show_tag_assign_dialog = false;
+                                                }
+
+                                                if ui.button("Cancel").clicked() {
+                                                    app.show_tag_assign_dialog = false;
+                                                }
+                                            });
+                                        });
+                                }
                             }
 
                             btn
