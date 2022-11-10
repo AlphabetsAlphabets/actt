@@ -23,7 +23,7 @@ impl Debug for Activity {
             let time = &self.total_time[index].as_secs();
             let tag = &self.tag[index];
 
-            writeln!(f, "Name: {} #{} @{}s\n", name, time, tag)?;
+            writeln!(f, "Name: {} #{} - {}s", name, tag, time)?;
         }
 
         Ok(())
@@ -78,6 +78,8 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
     // There's nothing wrong with the return type. It's just that `CentralPanel` is also a function
     // Which means that the return type needs to cover that as well.
     egui::CentralPanel::default().show(ctx, |ui| {
+        app.activity_history = app.read_config_file();
+
         horizontal_menu(app, ui);
         ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
             ui.heading("Home");
@@ -108,6 +110,10 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                             let tags = &app.activity_history.tag;
                             let mut display = vec![];
                             for tag in tags {
+                                if *tag == "  " {
+                                    continue;
+                                }
+
                                 if *tag != prev {
                                     display.push(tag);
                                 }
@@ -260,28 +266,33 @@ fn activity_scroll(
 
                     column[0].vertical_centered_justified(|ui| ui.label(name));
                     column[1].vertical_centered_justified(|ui| {
-                        let tag = if tag == "--" {
-                            " ".to_string()
-                        } else {
-                            tag.to_string()
-                        };
+                        if tag == "  " {
+                            let tag = " ".to_string();
+                            let btn = egui::Button::new(tag.clone()).frame(false);
+                            let btn = ui.add(btn).on_hover_text("Double click to assign tag.");
 
-                        let btn = egui::Button::new(tag.clone()).frame(false);
-                        let btn = ui.add(btn).on_hover_text("Double click to delete tag.");
-
-                        if btn.double_clicked() {
-                            for user_gen_tag in app.activity_history.tag.iter_mut() {
-                                if *user_gen_tag == tag {
-                                    *user_gen_tag = "--".to_string();
-                                }
+                            if btn.double_clicked() {
+                                println!("Assign tag.");
                             }
-                            println!("{:#?}", app.activity_history);
 
-                            // app.write_config_file();
-                            // ctx.request_repaint();
-                        }
+                            btn
+                        } else {
+                            let btn = egui::Button::new(tag.clone()).frame(false);
+                            let btn = ui.add(btn).on_hover_text("Double click to delete tag.");
 
-                        btn
+                            if btn.double_clicked() {
+                                for user_gen_tag in app.activity_history.tag.iter_mut() {
+                                    if *user_gen_tag == tag {
+                                        *user_gen_tag = "  ".to_string();
+                                    }
+                                }
+
+                                app.write_config_file();
+                                ctx.request_repaint();
+                            }
+
+                            btn
+                        };
                     });
 
                     let m = total_time / 60;
