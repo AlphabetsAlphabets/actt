@@ -1,4 +1,7 @@
-use std::time::{Duration, Instant};
+use std::{
+    fmt::{self, Debug},
+    time::{Duration, Instant},
+};
 
 use crate::App;
 use egui::{Color32, RichText, ScrollArea, Ui, Vec2};
@@ -11,6 +14,20 @@ pub struct Activity {
     name: Vec<String>,
     total_time: Vec<Duration>,
     tag: Vec<String>,
+}
+
+impl Debug for Activity {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // name: <name> #<tag> @ <time>
+        for (index, name) in self.name.iter().enumerate() {
+            let time = &self.total_time[index].as_secs();
+            let tag = &self.tag[index];
+
+            writeln!(f, "Name: {} #{} @{}s\n", name, time, tag)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(PartialEq)]
@@ -46,12 +63,12 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
             ui.label("A history of all your activities, and how long you've spent on each one!");
             ui.separator();
 
-            let act = app.read_config_file();
+            let mut act = app.read_config_file();
 
             if act.name.len() == 0 {
                 ui.label("It's empty!");
             } else {
-                activity_scroll(app, act, ctx, _frame, ui);
+                activity_scroll(app, &mut act, ctx, _frame, ui);
             }
         });
     });
@@ -217,7 +234,7 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
 
 fn activity_scroll(
     app: &mut App,
-    act: Activity,
+    act: &mut Activity,
     ctx: &egui::Context,
     _frame: &mut eframe::Frame,
     ui: &mut Ui,
@@ -238,11 +255,34 @@ fn activity_scroll(
 
             for (index, name) in act.name.iter().enumerate() {
                 ui.columns(4, |column| {
-                    let tag = &act.tag[index];
+                    let tag = act.tag[index].clone();
                     let total_time = &act.total_time[index].as_secs();
 
                     column[0].vertical_centered_justified(|ui| ui.label(name));
-                    column[1].vertical_centered_justified(|ui| ui.label(tag));
+                    column[1].vertical_centered_justified(|ui| {
+                        let tag = if tag == "--" {
+                            " ".to_string()
+                        } else {
+                            tag.to_string()
+                        };
+
+                        let btn = egui::Button::new(tag.clone()).frame(false);
+                        let btn = ui.add(btn).on_hover_text("Double click to delete tag.");
+
+                        if btn.double_clicked() {
+                            for user_gen_tag in app.activity_history.tag.iter_mut() {
+                                if *user_gen_tag == tag {
+                                    *user_gen_tag = "--".to_string();
+                                }
+                            }
+                            println!("{:#?}", app.activity_history);
+
+                            // app.write_config_file();
+                            // ctx.request_repaint();
+                        }
+
+                        btn
+                    });
 
                     let m = total_time / 60;
                     let s = total_time % 60;
