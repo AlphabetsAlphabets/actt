@@ -3,8 +3,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::colors::*;
 use crate::App;
-use egui::{Color32, RichText, ScrollArea, TextBuffer, Ui, Vec2};
+use egui::{ScrollArea, Ui, Vec2};
 
 use egui_dropdown::DropDownBox;
 use serde::{Deserialize, Serialize};
@@ -123,7 +124,7 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
             ui.label("\n");
             if ui.button("Start").clicked() {
                 if app.activity_name.len() <= 0 {
-                    app.warning = Some("Activity cannot be empty!".to_string());
+                    app.warning = Some("Activity name cannot be empty!".to_string());
                 } else {
                     if app.tag.is_empty() {
                         app.tag = "  ".to_string();
@@ -148,6 +149,7 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                 None => ui.label("\n\n"),
                 Some(msg) => {
                     let msg = format!("\n{}\n", msg);
+                    let msg = red_text(msg.as_str());
                     ui.label(msg)
                 }
             };
@@ -240,10 +242,6 @@ fn activity_scroll(
     scroll_area.show(ui, |ui| {
         ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
             ui.columns(4, |column| {
-                let blue_text = |text: &str| RichText::new(text).color(Color32::LIGHT_BLUE);
-
-                let red_text = |text: &str| RichText::new(text).color(Color32::LIGHT_RED);
-
                 column[0].vertical_centered_justified(|ui| ui.label(blue_text("Name")));
                 column[1].vertical_centered_justified(|ui| ui.label(blue_text("Tag")));
                 column[2].vertical_centered_justified(|ui| ui.label(blue_text("Time spent")));
@@ -252,42 +250,37 @@ fn activity_scroll(
 
             for (index, name) in act.name.iter().enumerate() {
                 ui.columns(4, |column| {
-                    let mut tag = act.tag[index].clone();
+                    let tag = act.tag[index].clone();
                     let total_time = &act.total_time[index].as_secs();
 
                     column[0].vertical_centered_justified(|ui| ui.label(name));
                     column[1].vertical_centered_justified(|ui| {
                         if tag == "  " {
-                            let btn = egui::Button::new(tag.clone()).frame(false);
-                            let btn = ui.add(btn).on_hover_text("Double click to assign tag.");
+                            if app.show_tag_assign_dialog && *name == app.target_name {
+                                let r = ui.text_edit_singleline(&mut app.new_tag);
 
-                            if btn.double_clicked() {
-                                app.show_tag_assign_dialog = true;
-                                if app.show_tag_assign_dialog {
-                                    egui::Window::new("Assign tag")
-                                        .collapsible(false)
-                                        .resizable(false)
-                                        .show(ctx, |ui| {
-                                            ui.horizontal(|ui| {
-                                                ui.text_edit_singleline(&mut tag);
+                                let lost_focus = r.lost_focus();
+                                let key_pressed = |key: egui::Key| ui.input().key_pressed(key);
 
-                                                if ui.button("Assign").clicked() {
-                                                    act.tag[index] = tag.clone();
-                                                    app.activity_history.tag[index] = tag;
-                                                    app.write_config_file();
-
-                                                    app.show_tag_assign_dialog = false;
-                                                }
-
-                                                if ui.button("Cancel").clicked() {
-                                                    app.show_tag_assign_dialog = false;
-                                                }
-                                            });
-                                        });
+                                if lost_focus && key_pressed(egui::Key::Enter) {
+                                    app.activity_history.tag[index] = app.new_tag.clone();
+                                    app.write_config_file();
+                                    app.show_tag_assign_dialog = false;
+                                } else if lost_focus && key_pressed(egui::Key::Escape) {
+                                    app.show_tag_assign_dialog = false;
                                 }
-                            }
 
-                            btn
+                                r
+                            } else {
+                                let btn = egui::Button::new(tag.clone()).frame(false);
+                                let r = ui.add(btn).on_hover_text("Double click to assign tag.");
+                                if r.double_clicked() {
+                                    app.target_name = name.clone();
+                                    app.show_tag_assign_dialog = true;
+                                }
+
+                                r
+                            }
                         } else {
                             let btn = egui::Button::new(tag.clone()).frame(false);
                             let btn = ui.add(btn).on_hover_text("Double click to delete tag.");

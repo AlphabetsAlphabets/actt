@@ -1,4 +1,5 @@
 mod app;
 pub use app::App;
 
-pub mod screens;
+mod colors;
+mod screens;

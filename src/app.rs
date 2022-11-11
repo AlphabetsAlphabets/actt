@@ -1,4 +1,4 @@
-use super::screens::{Activity, Screen, *};
+use crate::screens::{Activity, Screen, *};
 
 use std::path::{Path, PathBuf};
 use std::{

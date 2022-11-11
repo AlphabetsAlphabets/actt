@@ -2,7 +2,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![feature(drain_filter)]
 
-use actt::screens;
 use actt::App;
 use eframe;
 
