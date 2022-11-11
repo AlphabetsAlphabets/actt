@@ -17,23 +17,35 @@ pub struct App {
     pub buf: String,
 
     #[serde(skip)]
-    pub show_tag_assign_dialog: bool,
-    #[serde(skip)]
-    pub pause_time: Option<Instant>,
-    #[serde(skip)]
     pub config_file: PathBuf,
     #[serde(skip)]
     pub activity_history: Activity,
+
+    #[serde(skip)]
+    pub pause_time: Option<Instant>,
     #[serde(skip)]
     pub total_pause_time: Duration,
     #[serde(skip)]
     pub total_time: Option<Instant>,
     #[serde(skip)]
     pub work_time: Duration,
+
+    // This group of tags is used in the `activity_history` function.
+    // This is used when the user wishes to create a new tag and assign it
+    // to an activity that does not have a tag.
     #[serde(skip)]
-    pub warning: Option<String>,
+    pub target_name: String,
+    #[serde(skip)]
+    pub show_tag_assign_dialog: bool,
+    #[serde(skip)]
+    pub new_tag: String,
+    #[serde(skip)]
+    pub display: Vec<String>,
+
     #[serde(skip)]
     pub screen: Screen,
+    #[serde(skip)]
+    pub warning: Option<String>,
 }
 
 impl Default for App {
@@ -56,18 +68,22 @@ impl Default for App {
             activity_name: "".to_string(),
             tag: "".to_string(),
             buf: "".to_string(),
-            warning: None,
 
-            total_time: None,
             config_file: config_file.to_path_buf(),
             activity_history: Activity::default(),
+
+            total_time: None,
             pause_time: None,
             total_pause_time: Duration::from_secs(0),
             work_time: Duration::from_secs(0),
 
+            target_name: "".to_string(),
+            new_tag: "".to_string(),
             show_tag_assign_dialog: false,
+            display: vec![],
 
             screen: Screen::Start,
+            warning: None,
         }
     }
 }
@@ -86,6 +102,7 @@ impl App {
             Err(_) => Activity::default(),
         }
     }
+
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customized the look at feel of egui using
