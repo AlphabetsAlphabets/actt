@@ -106,16 +106,19 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                     ui.columns(2, |column| {
                         column[0].vertical_centered_justified(|ui| ui.label("Tag"));
                         column[1].vertical_centered_justified(|ui| {
-                            let mut prev = vec![];
+                            let mut prev = "".to_string();
                             let tags = &app.activity_history.tag;
                             let mut display = vec![];
                             for tag in tags {
-                                if prev.contains(tag) || *tag == "  " {
+                                if *tag == "  " {
                                     continue;
                                 }
 
-                                display.push(tag);
-                                prev.push(tag.clone());
+                                if *tag != prev {
+                                    display.push(tag);
+                                }
+
+                                prev = tag.clone();
                             }
 
                             ui.add(DropDownBox::from_iter(
