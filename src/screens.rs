@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::App;
-use egui::{Color32, RichText, ScrollArea, Ui, Vec2};
+use egui::{Color32, RichText, ScrollArea, TextBuffer, Ui, Vec2};
 
 use egui_dropdown::DropDownBox;
 use serde::{Deserialize, Serialize};
@@ -106,19 +106,16 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                     ui.columns(2, |column| {
                         column[0].vertical_centered_justified(|ui| ui.label("Tag"));
                         column[1].vertical_centered_justified(|ui| {
-                            let mut prev = "".to_string();
+                            let mut prev = vec![];
                             let tags = &app.activity_history.tag;
                             let mut display = vec![];
                             for tag in tags {
-                                if *tag == "  " {
+                                if prev.contains(tag) || *tag == "  " {
                                     continue;
                                 }
 
-                                if *tag != prev {
-                                    display.push(tag);
-                                }
-
-                                prev = tag.clone();
+                                display.push(tag);
+                                prev.push(tag.clone());
                             }
 
                             ui.add(DropDownBox::from_iter(
@@ -132,6 +129,10 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                     });
                 },
             );
+
+            if app.tag.is_empty() {
+                app.tag = "  ".to_string();
+            }
 
             ui.label("\n");
             if ui.button("Start").clicked() {
