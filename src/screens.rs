@@ -5,7 +5,7 @@ use std::{
 
 use crate::colors::*;
 use crate::App;
-use egui::{ScrollArea, Ui, Vec2};
+use egui::{Label, ScrollArea, Sense, Ui, Vec2};
 
 use egui_dropdown::DropDownBox;
 use serde::{Deserialize, Serialize};
@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 pub struct Activity {
     name: Vec<String>,
     total_time: Vec<Duration>,
-    tag: Vec<String>,
+    pub tag: Vec<String>,
 }
 
 impl Debug for Activity {
@@ -251,53 +251,19 @@ fn activity_scroll(
             for (index, name) in act.name.iter().enumerate() {
                 ui.columns(4, |column| {
                     let tag = act.tag[index].clone();
+                    app.tag = tag.clone();
                     let total_time = &act.total_time[index].as_secs();
 
                     column[0].vertical_centered_justified(|ui| ui.label(name));
                     column[1].vertical_centered_justified(|ui| {
-                        if tag == "  " {
-                            if app.show_tag_assign_dialog && *name == app.target_name {
-                                let r = ui.text_edit_singleline(&mut app.new_tag);
-
-                                let lost_focus = r.lost_focus();
-                                let key_pressed = |key: egui::Key| ui.input().key_pressed(key);
-
-                                if lost_focus && key_pressed(egui::Key::Enter) {
-                                    app.activity_history.tag[index] = app.new_tag.clone();
-                                    app.write_config_file();
-                                    app.show_tag_assign_dialog = false;
-                                } else if lost_focus && key_pressed(egui::Key::Escape) {
-                                    app.show_tag_assign_dialog = false;
-                                }
-
-                                r
-                            } else {
-                                let btn = egui::Button::new(tag.clone()).frame(false);
-                                let r = ui.add(btn).on_hover_text("Double click to assign tag.");
-                                if r.double_clicked() {
-                                    app.target_name = name.clone();
-                                    app.show_tag_assign_dialog = true;
-                                }
-
-                                r
+                        let label = Label::new(app.tag.clone()).sense(Sense::click());
+                        let r = ui.add(label);
+                        r.context_menu(|ui| {
+                            app.assign_tag(ui, name, index);
+                            if tag != "  " {
+                                app.delete_tag(ui, ctx, tag);
                             }
-                        } else {
-                            let btn = egui::Button::new(tag.clone()).frame(false);
-                            let btn = ui.add(btn).on_hover_text("Double click to delete tag.");
-
-                            if btn.double_clicked() {
-                                for user_gen_tag in app.activity_history.tag.iter_mut() {
-                                    if *user_gen_tag == tag {
-                                        *user_gen_tag = "  ".to_string();
-                                    }
-                                }
-
-                                app.write_config_file();
-                                ctx.request_repaint();
-                            }
-
-                            btn
-                        };
+                        });
                     });
 
                     let m = total_time / 60;

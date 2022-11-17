@@ -7,6 +7,7 @@ use std::{
 };
 
 use dirs::config_dir;
+use egui::Response;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -100,6 +101,48 @@ impl App {
         match serde_json::from_str(contents) {
             Ok(act) => act,
             Err(_) => Activity::default(),
+        }
+    }
+
+    /// Used to create new tags or change name of current tag
+    pub fn assign_tag(&mut self, ui: &mut egui::Ui, name: &String, index: usize) {
+        if self.show_tag_assign_dialog && *name == self.target_name {
+            let r = ui.text_edit_singleline(&mut self.new_tag);
+
+            let lost_focus = r.lost_focus();
+            let key_pressed = |key: egui::Key| ui.input().key_pressed(key);
+
+            if lost_focus && key_pressed(egui::Key::Enter) {
+                self.activity_history.tag[index] = self.new_tag.clone();
+                self.write_config_file();
+                self.show_tag_assign_dialog = false;
+                ui.close_menu();
+            } else if lost_focus && key_pressed(egui::Key::Escape) {
+                self.show_tag_assign_dialog = false;
+                ui.close_menu();
+            }
+        } else {
+            let btn = egui::Button::new("Change tag").frame(false);
+            if ui.add(btn).clicked() {
+                self.target_name = name.clone();
+                self.show_tag_assign_dialog = true;
+            };
+        }
+    }
+
+    pub fn delete_tag(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, tag: String) {
+        let btn = egui::Button::new("Delete tag").frame(false);
+        if ui.add(btn).clicked() {
+            for user_gen_tag in self.activity_history.tag.iter_mut() {
+                if *user_gen_tag == tag {
+                    *user_gen_tag = "  ".to_string();
+                }
+            }
+
+            self.write_config_file();
+            ctx.request_repaint();
+
+            ui.close_menu();
         }
     }
 
