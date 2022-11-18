@@ -7,7 +7,6 @@ use std::{
 };
 
 use dirs::config_dir;
-use egui::Response;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -37,7 +36,13 @@ pub struct App {
     #[serde(skip)]
     pub target_name: String,
     #[serde(skip)]
+    pub focus: bool,
+    #[serde(skip)]
+    pub show_name_assign_dialog: bool,
+    #[serde(skip)]
     pub show_tag_assign_dialog: bool,
+    #[serde(skip)]
+    pub new_name: String,
     #[serde(skip)]
     pub new_tag: String,
     #[serde(skip)]
@@ -79,7 +84,10 @@ impl Default for App {
             work_time: Duration::from_secs(0),
 
             target_name: "".to_string(),
+            new_name: "".to_string(),
             new_tag: "".to_string(),
+            focus: false,
+            show_name_assign_dialog: false,
             show_tag_assign_dialog: false,
             display: vec![],
 
@@ -104,10 +112,46 @@ impl App {
         }
     }
 
+    /// Assign a new name to an activity
+    pub fn assign_name(&mut self, ui: &mut egui::Ui, name: &String, index: usize) {
+        if self.show_name_assign_dialog && self.target_name == *name {
+            let r = ui.text_edit_singleline(&mut self.new_name);
+            if !self.focus {
+                r.request_focus();
+                self.focus = true;
+            }
+
+            let lost_focus = r.lost_focus();
+            let key_pressed = |key: egui::Key| ui.input().key_pressed(key);
+
+            if lost_focus && key_pressed(egui::Key::Enter) {
+                if !self.new_name.trim().is_empty() {
+                    self.activity_history.name[index] = self.new_name.clone();
+                    self.write_config_file();
+                }
+                self.show_name_assign_dialog = false;
+                self.focus = false;
+            } else if lost_focus {
+                self.show_name_assign_dialog = false;
+                self.focus = false;
+            }
+        } else {
+            let btn = egui::Button::new(name).frame(false);
+            if ui.add(btn).clicked() {
+                self.target_name = name.clone();
+                self.show_name_assign_dialog = true;
+            };
+        }
+    }
+
     /// Used to create new tags or change name of current tag
     pub fn assign_tag(&mut self, ui: &mut egui::Ui, name: &String, index: usize) {
         if self.show_tag_assign_dialog && *name == self.target_name {
             let r = ui.text_edit_singleline(&mut self.new_tag);
+            if !self.focus {
+                r.request_focus();
+                self.focus = true;
+            }
 
             let lost_focus = r.lost_focus();
             let key_pressed = |key: egui::Key| ui.input().key_pressed(key);
@@ -116,13 +160,15 @@ impl App {
                 self.activity_history.tag[index] = self.new_tag.clone();
                 self.write_config_file();
                 self.show_tag_assign_dialog = false;
+                self.focus = false;
                 ui.close_menu();
-            } else if lost_focus && key_pressed(egui::Key::Escape) {
+            } else if r.lost_focus() {
                 self.show_tag_assign_dialog = false;
+                self.focus = false;
                 ui.close_menu();
             }
         } else {
-            let btn = egui::Button::new("Change tag").frame(false);
+            let btn = egui::Button::new("Change/Assign tag").frame(false);
             if ui.add(btn).clicked() {
                 self.target_name = name.clone();
                 self.show_tag_assign_dialog = true;
@@ -130,7 +176,7 @@ impl App {
         }
     }
 
-    pub fn delete_tag(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, tag: String) {
+    pub fn delete_tag(&mut self, ui: &mut egui::Ui, tag: String) {
         let btn = egui::Button::new("Delete tag").frame(false);
         if ui.add(btn).clicked() {
             for user_gen_tag in self.activity_history.tag.iter_mut() {
@@ -140,8 +186,6 @@ impl App {
             }
 
             self.write_config_file();
-            ctx.request_repaint();
-
             ui.close_menu();
         }
     }

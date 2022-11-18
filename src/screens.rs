@@ -5,14 +5,14 @@ use std::{
 
 use crate::colors::*;
 use crate::App;
-use egui::{Label, ScrollArea, Sense, Ui, Vec2};
+use egui::{Button, Color32, Label, RichText, ScrollArea, Sense, Ui, Vec2};
 
 use egui_dropdown::DropDownBox;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Default)]
 pub struct Activity {
-    name: Vec<String>,
+    pub name: Vec<String>,
     total_time: Vec<Duration>,
     pub tag: Vec<String>,
 }
@@ -69,7 +69,7 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
             if act.name.len() == 0 {
                 ui.label("It's empty!");
             } else {
-                activity_scroll(app, &mut act, ctx, _frame, ui);
+                activity_listing(app, &mut act, ctx, _frame, ui);
             }
         });
     });
@@ -143,7 +143,9 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
     egui::CentralPanel::default().show(ctx, |ui| {
         ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
             ui.label("\n\n\n");
-            let header = format!("Tracking activity '{}'", app.activity_name);
+            let header = RichText::new(app.activity_name.clone())
+                .color(Color32::LIGHT_BLUE)
+                .size(32.0);
             ui.heading(header);
             match &app.warning {
                 None => ui.label("\n\n"),
@@ -231,7 +233,7 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
     });
 }
 
-fn activity_scroll(
+fn activity_listing(
     app: &mut App,
     act: &mut Activity,
     ctx: &egui::Context,
@@ -254,14 +256,16 @@ fn activity_scroll(
                     app.tag = tag.clone();
                     let total_time = &act.total_time[index].as_secs();
 
-                    column[0].vertical_centered_justified(|ui| ui.label(name));
+                    column[0].vertical_centered_justified(|ui| {
+                        app.assign_name(ui, name, index);
+                    });
                     column[1].vertical_centered_justified(|ui| {
                         let label = Label::new(app.tag.clone()).sense(Sense::click());
                         let r = ui.add(label);
                         r.context_menu(|ui| {
                             app.assign_tag(ui, name, index);
                             if tag != "  " {
-                                app.delete_tag(ui, ctx, tag);
+                                app.delete_tag(ui, tag);
                             }
                         });
                     });
@@ -287,7 +291,6 @@ fn activity_scroll(
                             name.remove(index);
                             total_time.remove(index);
                             tag.remove(index);
-                            ctx.request_repaint();
 
                             app.write_config_file();
                         }
@@ -296,6 +299,8 @@ fn activity_scroll(
             }
         });
     });
+
+    ctx.request_repaint();
 }
 
 fn prepare_tag_for_display(tags: &[String]) -> Vec<String> {
