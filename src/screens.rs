@@ -5,7 +5,9 @@ use std::{
 
 use crate::colors::*;
 use crate::App;
-use egui::{Button, Color32, Label, RichText, ScrollArea, Sense, Ui, Vec2};
+use egui::{
+    plot::Text, Button, Color32, Label, RichText, ScrollArea, Sense, TextEdit, TextStyle, Ui, Vec2,
+};
 
 use egui_dropdown::DropDownBox;
 use serde::{Deserialize, Serialize};
@@ -143,10 +145,37 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
     egui::CentralPanel::default().show(ctx, |ui| {
         ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
             ui.label("\n\n\n");
-            let header = RichText::new(app.activity_name.clone())
-                .color(Color32::LIGHT_BLUE)
-                .size(32.0);
-            ui.heading(header);
+            if !app.show_name_assign_dialog {
+                let text = RichText::new(app.activity_name.clone())
+                    .color(Color32::LIGHT_BLUE)
+                    .text_style(egui::TextStyle::Heading)
+                    .size(32.0);
+
+                let btn = Button::new(text).frame(false);
+                let r = ui.add(btn);
+
+                if r.clicked() {
+                    app.show_name_assign_dialog = true;
+                }
+            } else {
+                let text_edit = TextEdit::singleline(&mut app.new_name)
+                    .font(TextStyle::Heading)
+                    .text_color(Color32::LIGHT_BLUE);
+
+                let r = ui.add(text_edit);
+                if !app.focus {
+                    r.request_focus();
+                    app.focus = true;
+                }
+
+                if app.entered(r, ui) {
+                    app.activity_name = app.new_name.clone();
+                    app.show_name_assign_dialog = false;
+                } else {
+                    app.show_name_assign_dialog = false;
+                }
+            }
+
             match &app.warning {
                 None => ui.label("\n\n"),
                 Some(msg) => {
@@ -161,7 +190,6 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                 None => app.total_time.unwrap().elapsed().as_secs(),
             };
 
-            // 5741s
             let m = total_time / 60;
             let s = total_time % 60;
             let h = m / 60;

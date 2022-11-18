@@ -7,6 +7,7 @@ use std::{
 };
 
 use dirs::config_dir;
+use egui::Response;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -97,7 +98,38 @@ impl Default for App {
     }
 }
 
+impl eframe::App for App {
+    /// Called by the frame work to save state before shutdown.
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        eframe::set_value(storage, eframe::APP_KEY, self);
+    }
+
+    /// Called each time the UI needs repainting, which may be many times per second.
+    /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        match self.screen {
+            Screen::Start => start_screen(self, ctx, _frame),
+            Screen::Tracking | Screen::Pause => tracking_screen(self, ctx, _frame),
+            Screen::History => history_screen(self, ctx, _frame),
+        }
+    }
+}
+
 impl App {
+    /// Called once before the first frame.
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        // This is also where you can customized the look at feel of egui using
+        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
+
+        // Load previous app state (if any).
+        // Note that you must enable the `persistence` feature for this to work.
+        if let Some(storage) = cc.storage {
+            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+        }
+
+        Default::default()
+    }
+
     pub fn write_config_file(&self) {
         let json = serde_json::to_string(&self.activity_history).unwrap();
         fs::write(&self.config_file, json).unwrap();
@@ -121,17 +153,14 @@ impl App {
                 self.focus = true;
             }
 
-            let lost_focus = r.lost_focus();
-            let key_pressed = |key: egui::Key| ui.input().key_pressed(key);
-
-            if lost_focus && key_pressed(egui::Key::Enter) {
+            if self.entered(r, ui) {
                 if !self.new_name.trim().is_empty() {
                     self.activity_history.name[index] = self.new_name.clone();
                     self.write_config_file();
                 }
                 self.show_name_assign_dialog = false;
                 self.focus = false;
-            } else if lost_focus {
+            } else {
                 self.show_name_assign_dialog = false;
                 self.focus = false;
             }
@@ -153,16 +182,13 @@ impl App {
                 self.focus = true;
             }
 
-            let lost_focus = r.lost_focus();
-            let key_pressed = |key: egui::Key| ui.input().key_pressed(key);
-
-            if lost_focus && key_pressed(egui::Key::Enter) {
+            if self.entered(r, ui) {
                 self.activity_history.tag[index] = self.new_tag.clone();
                 self.write_config_file();
                 self.show_tag_assign_dialog = false;
                 self.focus = false;
                 ui.close_menu();
-            } else if r.lost_focus() {
+            } else {
                 self.show_tag_assign_dialog = false;
                 self.focus = false;
                 ui.close_menu();
@@ -190,34 +216,16 @@ impl App {
         }
     }
 
-    /// Called once before the first frame.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // This is also where you can customized the look at feel of egui using
-        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
+    pub fn entered(&mut self, r: Response, ui: &mut egui::Ui) -> bool {
+        let lost_focus = r.lost_focus();
+        let key_pressed = |key: egui::Key| ui.input().key_pressed(key);
 
-        // Load previous app state (if any).
-        // Note that you must enable the `persistence` feature for this to work.
-        if let Some(storage) = cc.storage {
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
-        }
-
-        Default::default()
-    }
-}
-
-impl eframe::App for App {
-    /// Called by the frame work to save state before shutdown.
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, eframe::APP_KEY, self);
-    }
-
-    /// Called each time the UI needs repainting, which may be many times per second.
-    /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        match self.screen {
-            Screen::Start => start_screen(self, ctx, _frame),
-            Screen::Tracking | Screen::Pause => tracking_screen(self, ctx, _frame),
-            Screen::History => history_screen(self, ctx, _frame),
+        if lost_focus && key_pressed(egui::Key::Enter) {
+            true
+        } else if r.lost_focus() {
+            false
+        } else {
+            false
         }
     }
 }
