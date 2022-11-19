@@ -5,7 +5,10 @@ use std::{
 
 use crate::colors::*;
 use crate::App;
-use egui::{Button, Color32, Label, RichText, ScrollArea, Sense, Ui, Vec2};
+use egui::{
+    color_picker::{color_picker_color32, Alpha},
+    stroke_ui, Button, Color32, Label, RichText, ScrollArea, Sense, Ui, Vec2,
+};
 
 use egui_dropdown::DropDownBox;
 use serde::{Deserialize, Serialize};
@@ -14,6 +17,7 @@ use serde::{Deserialize, Serialize};
 pub struct Activity {
     pub name: Vec<String>,
     total_time: Vec<Duration>,
+    color: Vec<Color32>,
     pub tag: Vec<String>,
 }
 
@@ -118,6 +122,13 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                             .on_hover_text("What category is this activity under?");
                         });
                     });
+
+                    ui.columns(2, |column| {
+                        column[0].vertical_centered_justified(|ui| ui.label("Tag color"));
+                        column[1].vertical_centered_justified(|ui| {
+                            color_picker_color32(ui, &mut app.color, Alpha::Opaque);
+                        });
+                    });
                 },
             );
 
@@ -143,8 +154,12 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
     egui::CentralPanel::default().show(ctx, |ui| {
         ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
             ui.label("\n\n\n");
+            let r = app.color.r() as u8;
+            let g = app.color.g() as u8;
+            let b = app.color.b() as u8;
+
             let header = RichText::new(app.activity_name.clone())
-                .color(Color32::LIGHT_BLUE)
+                .color(Color32::from_rgb(r, g, b))
                 .size(32.0);
             ui.heading(header);
             match &app.warning {
@@ -195,10 +210,12 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                         act.name = vec![app.activity_name.clone()];
                         act.total_time = vec![app.total_time.unwrap().elapsed()];
                         act.tag = vec![app.tag.clone()];
+                        act.color = vec![app.color];
                     } else {
                         act.name.push(app.activity_name.clone());
                         act.total_time.push(app.total_time.unwrap().elapsed());
                         act.tag.push(app.tag.clone());
+                        act.color.push(app.color);
                     }
 
                     app.activity_history = act;
@@ -260,7 +277,8 @@ fn activity_listing(
                         app.assign_name(ui, name, index);
                     });
                     column[1].vertical_centered_justified(|ui| {
-                        let label = Label::new(app.tag.clone()).sense(Sense::click());
+                        let text = RichText::new(app.tag.clone()).color(act.color[index]);
+                        let label = Label::new(text).sense(Sense::click());
                         let r = ui.add(label);
                         r.context_menu(|ui| {
                             app.assign_tag(ui, name, index);
@@ -285,12 +303,14 @@ fn activity_listing(
                             let Activity {
                                 name,
                                 total_time,
+                                color,
                                 tag,
                             } = &mut app.activity_history;
 
                             name.remove(index);
                             total_time.remove(index);
                             tag.remove(index);
+                            color.remove(index);
 
                             app.write_config_file();
                         }

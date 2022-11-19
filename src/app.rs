@@ -7,6 +7,7 @@ use std::{
 };
 
 use dirs::config_dir;
+use egui::{Color32, Stroke};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -44,9 +45,15 @@ pub struct App {
     #[serde(skip)]
     pub new_name: String,
     #[serde(skip)]
+    pub new_name_index: usize,
+    #[serde(skip)]
     pub new_tag: String,
     #[serde(skip)]
     pub display: Vec<String>,
+
+    // This is used for visual distinction plus the sunburst.
+    #[serde(skip)]
+    pub color: Color32,
 
     #[serde(skip)]
     pub screen: Screen,
@@ -85,11 +92,14 @@ impl Default for App {
 
             target_name: "".to_string(),
             new_name: "".to_string(),
+            new_name_index: usize::MAX,
             new_tag: "".to_string(),
             focus: false,
             show_name_assign_dialog: false,
             show_tag_assign_dialog: false,
             display: vec![],
+
+            color: Color32::BLACK,
 
             screen: Screen::Start,
             warning: None,
@@ -114,7 +124,12 @@ impl App {
 
     /// Assign a new name to an activity
     pub fn assign_name(&mut self, ui: &mut egui::Ui, name: &String, index: usize) {
-        if self.show_name_assign_dialog && self.target_name == *name {
+        // XXX: As long as there are activities with the same name, the text
+        // box will appear.
+        if self.show_name_assign_dialog
+            && self.target_name == *name
+            && (self.new_name_index != usize::MAX)
+        {
             let r = ui.text_edit_singleline(&mut self.new_name);
             if !self.focus {
                 r.request_focus();
@@ -131,14 +146,17 @@ impl App {
                 }
                 self.show_name_assign_dialog = false;
                 self.focus = false;
+                self.new_name_index = usize::MAX;
             } else if lost_focus {
                 self.show_name_assign_dialog = false;
                 self.focus = false;
+                self.new_name_index = usize::MAX;
             }
         } else {
             let btn = egui::Button::new(name).frame(false);
             if ui.add(btn).clicked() {
                 self.target_name = name.clone();
+                self.new_name_index = index;
                 self.show_name_assign_dialog = true;
             };
         }
