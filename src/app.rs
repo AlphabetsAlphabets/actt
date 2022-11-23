@@ -1,13 +1,14 @@
 use crate::screens::{Activity, Screen, *};
 
-use std::path::{Path, PathBuf};
 use std::{
+    collections::HashMap,
     fs,
+    path::{Path, PathBuf},
     time::{Duration, Instant},
 };
 
 use dirs::config_dir;
-use egui::{Color32, Stroke};
+use egui::Color32;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -20,7 +21,7 @@ pub struct App {
     #[serde(skip)]
     pub config_file: PathBuf,
     #[serde(skip)]
-    pub activity_history: Activity,
+    pub activity: Activity,
 
     #[serde(skip)]
     pub pause_time: Option<Instant>,
@@ -30,6 +31,9 @@ pub struct App {
     pub total_time: Option<Instant>,
     #[serde(skip)]
     pub work_time: Duration,
+
+    // This is used for visual distinction plus the sunburst.
+    pub color: Color32,
 
     // This group of tags is used in the `activity_history` function.
     // This is used when the user wishes to create a new tag and assign it
@@ -49,11 +53,7 @@ pub struct App {
     #[serde(skip)]
     pub new_tag: String,
     #[serde(skip)]
-    pub display: Vec<String>,
-
-    // This is used for visual distinction plus the sunburst.
-    #[serde(skip)]
-    pub color: Color32,
+    pub display: HashMap<String, Vec<usize>>,
 
     #[serde(skip)]
     pub screen: Screen,
@@ -83,7 +83,7 @@ impl Default for App {
             buf: "".to_string(),
 
             config_file: config_file.to_path_buf(),
-            activity_history: Activity::default(),
+            activity: Activity::default(),
 
             total_time: None,
             pause_time: None,
@@ -97,7 +97,7 @@ impl Default for App {
             focus: false,
             show_name_assign_dialog: false,
             show_tag_assign_dialog: false,
-            display: vec![],
+            display: HashMap::default(),
 
             color: Color32::BLACK,
 
@@ -109,7 +109,7 @@ impl Default for App {
 
 impl App {
     pub fn write_config_file(&self) {
-        let json = serde_json::to_string(&self.activity_history).unwrap();
+        let json = serde_json::to_string(&self.activity).unwrap();
         fs::write(&self.config_file, json).unwrap();
     }
 
@@ -141,7 +141,7 @@ impl App {
 
             if lost_focus && key_pressed(egui::Key::Enter) {
                 if !self.new_name.trim().is_empty() {
-                    self.activity_history.name[index] = self.new_name.clone();
+                    self.activity.name[index] = self.new_name.clone();
                     self.write_config_file();
                 }
                 self.show_name_assign_dialog = false;
@@ -175,7 +175,7 @@ impl App {
             let key_pressed = |key: egui::Key| ui.input().key_pressed(key);
 
             if lost_focus && key_pressed(egui::Key::Enter) {
-                self.activity_history.tag[index] = self.new_tag.clone();
+                self.activity.tag[index] = self.new_tag.clone();
                 self.write_config_file();
                 self.show_tag_assign_dialog = false;
                 self.focus = false;
@@ -197,7 +197,7 @@ impl App {
     pub fn delete_tag(&mut self, ui: &mut egui::Ui, tag: String) {
         let btn = egui::Button::new("Delete tag").frame(false);
         if ui.add(btn).clicked() {
-            for user_gen_tag in self.activity_history.tag.iter_mut() {
+            for user_gen_tag in self.activity.tag.iter_mut() {
                 if *user_gen_tag == tag {
                     *user_gen_tag = "  ".to_string();
                 }

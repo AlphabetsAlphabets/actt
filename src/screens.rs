@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fmt::{self, Debug},
     time::{Duration, Instant},
 };
@@ -7,7 +8,7 @@ use crate::colors::*;
 use crate::App;
 use egui::{
     color_picker::{color_picker_color32, Alpha},
-    stroke_ui, Button, Color32, Label, RichText, ScrollArea, Sense, Ui, Vec2,
+    Color32, Label, RichText, ScrollArea, Sense, Ui, Vec2,
 };
 
 use egui_dropdown::DropDownBox;
@@ -79,11 +80,12 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
     });
 }
 
+/// The start screen is where metadata about an activity is set.
 pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Frame) {
     // There's nothing wrong with the return type. It's just that `CentralPanel` is also a function
     // Which means that the return type needs to cover that as well.
     egui::CentralPanel::default().show(ctx, |ui| {
-        app.activity_history = app.read_config_file();
+        app.activity = app.read_config_file();
 
         horizontal_menu(app, ui);
         ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
@@ -100,6 +102,7 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                 Vec2::new(200.0, 200.0),
                 egui::Layout::top_down(egui::Align::Center),
                 |ui| {
+                    // 1 column per action.
                     ui.columns(2, |column| {
                         column[0].vertical_centered_justified(|ui| ui.label("Activity"));
                         column[1].vertical_centered_justified(|ui| {
@@ -111,13 +114,24 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                     ui.columns(2, |column| {
                         column[0].vertical_centered_justified(|ui| ui.label("Tag"));
                         column[1].vertical_centered_justified(|ui| {
-                            let display = prepare_tag_for_display(&app.activity_history.tag[..]);
+                            app.activity = app.read_config_file();
+                            // XXX: This logic works well, problem is it keeps swapping the
+                            // location of every entry whenever the mouse moves in the combo box
+                            app.display = prepare_tag_for_display(&app.activity.tag[..]);
+                            let tags: Vec<String> = app.display.clone().into_keys().collect();
+                            // TODO: Based on tag, change `app.color` to match the color of
+                            // previous tags. Changing the color of a tag changes the color of that
+                            // tag for ALL entries.
 
                             ui.add(DropDownBox::from_iter(
-                                &display,
+                                &tags,
                                 "tags",
                                 &mut app.tag,
-                                |ui, text| ui.selectable_label(false, text),
+                                |ui, text| {
+                                    let index = app.display.get(text).unwrap()[0];
+                                    app.color = app.activity.color[index];
+                                    ui.selectable_label(false, text)
+                                },
                             ))
                             .on_hover_text("What category is this activity under?");
                         });
@@ -218,7 +232,7 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                         act.color.push(app.color);
                     }
 
-                    app.activity_history = act;
+                    app.activity = act;
                     app.write_config_file();
 
                     app.pause_time = None;
@@ -298,14 +312,14 @@ fn activity_listing(
                     column[2].vertical_centered_justified(|ui| ui.label(total_time));
                     column[3].vertical_centered_justified(|ui| {
                         if ui.button("X").clicked() {
-                            app.activity_history = app.read_config_file();
+                            app.activity = app.read_config_file();
 
                             let Activity {
                                 name,
                                 total_time,
                                 color,
                                 tag,
-                            } = &mut app.activity_history;
+                            } = &mut app.activity;
 
                             name.remove(index);
                             total_time.remove(index);
@@ -323,17 +337,15 @@ fn activity_listing(
     ctx.request_repaint();
 }
 
-fn prepare_tag_for_display(tags: &[String]) -> Vec<String> {
-    let mut prev = vec![];
-    let mut display: Vec<String> = vec![];
-    for tag in tags {
-        if prev.contains(tag) || *tag == "  " {
-            continue;
-        }
+fn prepare_tag_for_display(tags: &[String]) -> HashMap<String, Vec<usize>> {
+    let mut map: HashMap<String, Vec<usize>> = HashMap::new();
 
-        display.push(tag.clone());
-        prev.push(tag.clone());
+    for (index, tag) in tags.iter().enumerate() {
+        map.entry(tag.clone())
+            .and_modify(|v| v.push(index))
+            .or_insert(vec![index]);
     }
 
-    display
+    // println!("{map:#?}");
+    map
 }
