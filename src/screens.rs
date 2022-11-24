@@ -1,11 +1,13 @@
+use crate::colors::*;
+use crate::constants::*;
+use crate::App;
+
 use std::{
     collections::HashMap,
     fmt::{self, Debug},
     time::{Duration, Instant},
 };
 
-use crate::colors::*;
-use crate::App;
 use egui::{
     color_picker::{color_picker_color32, Alpha},
     Color32, Label, RichText, ScrollArea, Sense, Ui, Vec2,
@@ -18,7 +20,7 @@ use serde::{Deserialize, Serialize};
 pub struct Activity {
     pub name: Vec<String>,
     total_time: Vec<Duration>,
-    color: Vec<Color32>,
+    pub color: Vec<Color32>,
     pub tag: Vec<String>,
 }
 
@@ -114,17 +116,24 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                     ui.columns(2, |column| {
                         column[0].vertical_centered_justified(|ui| ui.label("Tag"));
                         column[1].vertical_centered_justified(|ui| {
-                            app.activity = app.read_config_file();
-                            // XXX: This logic works well, problem is it keeps swapping the
-                            // location of every entry whenever the mouse moves in the combo box
-                            app.display = prepare_tag_for_display(&app.activity.tag[..]);
-                            let tags: Vec<String> = app.display.clone().into_keys().collect();
-                            // TODO: Based on tag, change `app.color` to match the color of
-                            // previous tags. Changing the color of a tag changes the color of that
-                            // tag for ALL entries.
+                            if !app.config_file_updated {
+                                // XXX: This logic works well, problem is it keeps swapping the
+                                // location of every entry whenever the mouse moves in the combo box
+                                app.display = prepare_tag_for_display(&app.activity.tag[..]);
+
+                                // TODO: Based on tag, change `app.color` to match the color of
+                                // previous tags. Changing the color of a tag changes the color of that
+                                // tag for ALL entries.
+
+                                app.config_file_updated = true;
+                            }
+
+                            if app.tag == EMPTY_TAG {
+                                app.tag = "".to_string();
+                            }
 
                             ui.add(DropDownBox::from_iter(
-                                &tags,
+                                &app.display.clone().into_keys().collect::<Vec<String>>(),
                                 "tags",
                                 &mut app.tag,
                                 |ui, text| {
@@ -152,7 +161,7 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                     app.warning = Some("Activity name cannot be empty!".to_string());
                 } else {
                     if app.tag.is_empty() {
-                        app.tag = "  ".to_string();
+                        app.tag = EMPTY_TAG.to_string();
                     }
 
                     app.warning = None;
@@ -287,17 +296,20 @@ fn activity_listing(
                     app.tag = tag.clone();
                     let total_time = &act.total_time[index].as_secs();
 
+                    // Name
                     column[0].vertical_centered_justified(|ui| {
                         app.assign_name(ui, name, index);
                     });
+
+                    // Tag
                     column[1].vertical_centered_justified(|ui| {
                         let text = RichText::new(app.tag.clone()).color(act.color[index]);
                         let label = Label::new(text).sense(Sense::click());
                         let r = ui.add(label);
                         r.context_menu(|ui| {
                             app.assign_tag(ui, name, index);
-                            if tag != "  " {
-                                app.delete_tag(ui, tag);
+                            if tag != EMPTY_TAG.to_string() {
+                                app.delete_tag(ui, tag, index);
                             }
                         });
                     });
@@ -309,7 +321,10 @@ fn activity_listing(
 
                     let total_time = format!("{}h {}m {}s", h, m, s);
 
+                    // Total time
                     column[2].vertical_centered_justified(|ui| ui.label(total_time));
+
+                    // Delete
                     column[3].vertical_centered_justified(|ui| {
                         if ui.button("X").clicked() {
                             app.activity = app.read_config_file();
@@ -346,6 +361,5 @@ fn prepare_tag_for_display(tags: &[String]) -> HashMap<String, Vec<usize>> {
             .or_insert(vec![index]);
     }
 
-    // println!("{map:#?}");
     map
 }

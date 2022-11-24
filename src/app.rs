@@ -1,3 +1,4 @@
+use crate::constants::*;
 use crate::screens::{Activity, Screen, *};
 
 use std::{
@@ -22,6 +23,7 @@ pub struct App {
     pub config_file: PathBuf,
     #[serde(skip)]
     pub activity: Activity,
+    pub config_file_updated: bool,
 
     #[serde(skip)]
     pub pause_time: Option<Instant>,
@@ -83,6 +85,7 @@ impl Default for App {
             buf: "".to_string(),
 
             config_file: config_file.to_path_buf(),
+            config_file_updated: false,
             activity: Activity::default(),
 
             total_time: None,
@@ -108,9 +111,10 @@ impl Default for App {
 }
 
 impl App {
-    pub fn write_config_file(&self) {
+    pub fn write_config_file(&mut self) {
         let json = serde_json::to_string(&self.activity).unwrap();
         fs::write(&self.config_file, json).unwrap();
+        self.config_file_updated = true;
     }
 
     pub fn read_config_file(&self) -> Activity {
@@ -164,6 +168,10 @@ impl App {
 
     /// Used to create new tags or change name of current tag
     pub fn assign_tag(&mut self, ui: &mut egui::Ui, name: &String, index: usize) {
+        // TODO: Turn this into a window instead. To do two things.
+        // 1. Assign tag as usual.
+        // 2. Pick a color for a tag.
+        // Reason being that when you delete a tag, you can't reassign a color.
         if self.show_tag_assign_dialog && *name == self.target_name {
             let r = ui.text_edit_singleline(&mut self.new_tag);
             if !self.focus {
@@ -194,12 +202,15 @@ impl App {
         }
     }
 
-    pub fn delete_tag(&mut self, ui: &mut egui::Ui, tag: String) {
+    pub fn delete_tag(&mut self, ui: &mut egui::Ui, tag: String, index: usize) {
         let btn = egui::Button::new("Delete tag").frame(false);
         if ui.add(btn).clicked() {
             for user_gen_tag in self.activity.tag.iter_mut() {
                 if *user_gen_tag == tag {
-                    *user_gen_tag = "  ".to_string();
+                    *user_gen_tag = EMPTY_TAG.to_string();
+                    if let Some(color) = self.activity.color.get_mut(index) {
+                        *color = DEFAULT_TAG_COLOR;
+                    }
                 }
             }
 
