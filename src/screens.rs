@@ -116,18 +116,19 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                     ui.columns(2, |column| {
                         column[0].vertical_centered_justified(|ui| ui.label("Tag"));
                         column[1].vertical_centered_justified(|ui| {
+                            // This is to stop the tags listed in the combox to keep flipping.
+                            // Without the if statement, this function would run everytime. Since
+                            // HashMaps keep items based on keys and not indexes, the order the
+                            // tags come in will be different each time the function is ran. As a
+                            // new hashmap is created each time the function executes.
                             if !app.config_file_updated {
-                                // XXX: This logic works well, problem is it keeps swapping the
-                                // location of every entry whenever the mouse moves in the combo box
                                 app.display = prepare_tag_for_display(&app.activity.tag[..]);
-
-                                // TODO: Based on tag, change `app.color` to match the color of
-                                // previous tags. Changing the color of a tag changes the color of that
-                                // tag for ALL entries.
-
                                 app.config_file_updated = true;
                             }
 
+                            // This is needed for when a tag is delete. Since an empty tag is two
+                            // blank spaces, in the tag text edit there will be two spaces
+                            // inserted. This is a fix for it.
                             if app.tag == EMPTY_TAG {
                                 app.tag = "".to_string();
                             }
@@ -177,12 +178,9 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
     egui::CentralPanel::default().show(ctx, |ui| {
         ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
             ui.label("\n\n\n");
-            let r = app.color.r() as u8;
-            let g = app.color.g() as u8;
-            let b = app.color.b() as u8;
 
             let header = RichText::new(app.activity_name.clone())
-                .color(Color32::from_rgb(r, g, b))
+                .color(app.color)
                 .size(32.0);
             ui.heading(header);
             match &app.warning {
@@ -199,7 +197,6 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                 None => app.total_time.unwrap().elapsed().as_secs(),
             };
 
-            // 5741s
             let m = total_time / 60;
             let s = total_time % 60;
             let h = m / 60;
@@ -223,6 +220,11 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                     app.screen = Screen::History;
                     match app.pause_time {
                         Some(pause_time) => {
+                            // Because `total_time` is an Instant adding it with a Duration makes
+                            // it so that the Instant began by Duration. Explanation by Dr Nefario:
+                            // let's say you have an instant for the time of 6AM, and it's currently 7AM.
+                            // the elapsed time will be 1 hour.
+                            // but if you add a 5 minute duration to the instant, making it 6:05AM, the elapsed time will now be 55 minutes
                             app.total_time = Some(app.total_time.unwrap() + pause_time.elapsed());
                         }
                         _ => (),
@@ -253,6 +255,7 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                     Screen::Pause => {
                         if columns[1].button("Resume").clicked() {
                             app.screen = Screen::Tracking;
+                            // Total run time of a task.
                             app.total_time =
                                 Some(app.total_time.unwrap() + app.pause_time.unwrap().elapsed());
                             app.pause_time = None;
@@ -262,7 +265,9 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                         if columns[1].button("Pause").clicked() {
                             app.screen = Screen::Pause;
                             match app.pause_time {
+                                // Some means paused before, don't want that. Reset the value.
                                 Some(_) => app.pause_time = None,
+                                // None means first pause.
                                 None => app.pause_time = Some(Instant::now()),
                             };
                         }
