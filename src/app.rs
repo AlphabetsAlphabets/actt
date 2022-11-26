@@ -17,50 +17,60 @@ use egui::Color32;
 pub struct App {
     pub activity_name: String,
     pub tag: String,
-    pub buf: String,
 
     #[serde(skip)]
     pub config_file: PathBuf,
+    // This is only used for updating the tags the user has made.
+    #[serde(skip)]
+    pub config_file_updated: bool,
     #[serde(skip)]
     pub activity: Activity,
-    pub config_file_updated: bool,
 
-    #[serde(skip)]
-    pub pause_time: Option<Instant>,
+    // This isn't used but I plan to use it to show how much time you spent relaxing.
+    // I'm unsure of the exact implementation details though. Cuz I'll have to go through the
+    // code for time again.
     #[serde(skip)]
     pub total_pause_time: Duration,
+    #[serde(skip)]
+    pub pause_time: Option<Instant>,
     #[serde(skip)]
     pub total_time: Option<Instant>,
     #[serde(skip)]
     pub work_time: Duration,
 
-    // This is used for visual distinction plus the sunburst.
-    pub color: Color32,
+    // This group is for changing the name of an activity.
+    #[serde(skip)]
+    pub show_name_assign_dialog: bool,
+    #[serde(skip)]
+    pub new_name: String,
+    #[serde(skip)]
+    pub target_index: usize,
 
     // This group of tags is used in the `activity_history` function.
     // This is used when the user wishes to create a new tag and assign it
     // to an activity that does not have a tag.
     #[serde(skip)]
-    pub target_name: String,
-    #[serde(skip)]
-    pub focus: bool,
-    #[serde(skip)]
-    pub show_name_assign_dialog: bool,
-    #[serde(skip)]
     pub show_tag_assign_dialog: bool,
-    #[serde(skip)]
-    pub new_name: String,
-    #[serde(skip)]
-    pub new_name_index: usize,
     #[serde(skip)]
     pub new_tag: String,
     #[serde(skip)]
-    pub display: HashMap<String, Vec<usize>>,
+    pub target_tag: String,
+    #[serde(skip)]
+    pub show_color_picker: bool,
 
+    #[serde(skip)]
+    pub display_ready_tags: HashMap<String, Vec<usize>>,
+
+    // Miscelanious. Ungrouped fields that don't belong to a particular group.
     #[serde(skip)]
     pub screen: Screen,
     #[serde(skip)]
     pub warning: Option<String>,
+
+    // This is used for visual distinction plus the sunburst.
+    pub color: Color32,
+    #[serde(skip)]
+    pub focus: bool,
 }
 
 impl Default for App {
@@ -82,30 +92,32 @@ impl Default for App {
         Self {
             activity_name: "".to_string(),
             tag: "".to_string(),
-            buf: "".to_string(),
 
             config_file: config_file.to_path_buf(),
             config_file_updated: false,
             activity: Activity::default(),
 
-            total_time: None,
-            pause_time: None,
             total_pause_time: Duration::from_secs(0),
+            pause_time: None,
+            total_time: None,
             work_time: Duration::from_secs(0),
 
-            target_name: "".to_string(),
-            new_name: "".to_string(),
-            new_name_index: usize::MAX,
-            new_tag: "".to_string(),
-            focus: false,
             show_name_assign_dialog: false,
-            show_tag_assign_dialog: false,
-            display: HashMap::default(),
+            new_name: "".to_string(),
+            target_index: usize::MAX,
 
-            color: Color32::BLACK,
+            show_tag_assign_dialog: false,
+            target_tag: "".to_string(),
+            new_tag: "".to_string(),
+            show_color_picker: false,
+
+            display_ready_tags: HashMap::default(),
 
             screen: Screen::Start,
             warning: None,
+
+            color: Color32::BLACK,
+            focus: false,
         }
     }
 }
@@ -128,12 +140,9 @@ impl App {
 
     /// Assign a new name to an activity
     pub fn assign_name(&mut self, ui: &mut egui::Ui, name: &String, index: usize) {
-        // XXX: As long as there are activities with the same name, the text
-        // box will appear.
-        if self.show_name_assign_dialog
-            && self.target_name == *name
-            && (self.new_name_index != usize::MAX)
-        {
+        let same_index = self.target_index != usize::MAX && index == self.target_index;
+
+        if self.show_name_assign_dialog && same_index {
             let r = ui.text_edit_singleline(&mut self.new_name);
             if !self.focus {
                 r.request_focus();
@@ -150,45 +159,50 @@ impl App {
                 }
                 self.show_name_assign_dialog = false;
                 self.focus = false;
-                self.new_name_index = usize::MAX;
+                self.target_index = usize::MAX;
             } else if lost_focus {
                 self.show_name_assign_dialog = false;
                 self.focus = false;
-                self.new_name_index = usize::MAX;
+                self.target_index = usize::MAX;
             }
         } else {
             let btn = egui::Button::new(name).frame(false);
             if ui.add(btn).clicked() {
-                self.target_name = name.clone();
-                self.new_name_index = index;
+                self.target_index = index;
                 self.show_name_assign_dialog = true;
             };
         }
     }
 
     /// Used to create new tags or change name of current tag
-    pub fn assign_tag(&mut self, ui: &mut egui::Ui, name: &String, index: usize) {
+    pub fn assign_tag(&mut self, ui: &mut egui::Ui, tag: &String, index: usize) {
         // TODO: Turn this into a window instead. To do two things.
         // 1. Assign tag as usual.
         // 2. Pick a color for a tag.
         // Reason being that when you delete a tag, you can't reassign a color.
-        if self.show_tag_assign_dialog && *name == self.target_name {
-            let r = ui.text_edit_singleline(&mut self.new_tag);
+        if self.show_tag_assign_dialog && *tag == self.target_tag {
+            let text_edit = ui.text_edit_singleline(&mut self.new_tag);
             if !self.focus {
-                r.request_focus();
+                text_edit.request_focus();
                 self.focus = true;
             }
 
-            let lost_focus = r.lost_focus();
+            let lost_focus = text_edit.lost_focus();
             let key_pressed = |key: egui::Key| ui.input().key_pressed(key);
 
             if lost_focus && key_pressed(egui::Key::Enter) {
-                self.activity.tag[index] = self.new_tag.clone();
+                for tag in self.activity.tag.iter_mut() {
+                    if *tag == self.target_tag {
+                        *tag = self.new_tag.clone();
+                    }
+                }
+
                 self.write_config_file();
                 self.show_tag_assign_dialog = false;
                 self.focus = false;
+
                 ui.close_menu();
-            } else if r.lost_focus() {
+            } else if text_edit.lost_focus() {
                 self.show_tag_assign_dialog = false;
                 self.focus = false;
                 ui.close_menu();
@@ -196,18 +210,21 @@ impl App {
         } else {
             let btn = egui::Button::new("Change/Assign tag").frame(false);
             if ui.add(btn).clicked() {
-                self.target_name = name.clone();
+                self.target_tag = tag.clone();
+                println!("{:#?}", self.target_tag);
                 self.show_tag_assign_dialog = true;
             };
         }
     }
 
-    pub fn delete_tag(&mut self, ui: &mut egui::Ui, tag: String, index: usize) {
+    /// target_tag: The tag that is to be deleted.
+    pub fn delete_tag(&mut self, ui: &mut egui::Ui, target_tag: String, index: usize) {
         let btn = egui::Button::new("Delete tag").frame(false);
         if ui.add(btn).clicked() {
-            for user_gen_tag in self.activity.tag.iter_mut() {
-                if *user_gen_tag == tag {
-                    *user_gen_tag = EMPTY_TAG.to_string();
+            for tag in self.activity.tag.iter_mut() {
+                if *tag == target_tag {
+                    // Sets the tag to an empty tag. Which signifies "deleted".
+                    *tag = EMPTY_TAG.to_string();
                     if let Some(color) = self.activity.color.get_mut(index) {
                         *color = DEFAULT_TAG_COLOR;
                     }

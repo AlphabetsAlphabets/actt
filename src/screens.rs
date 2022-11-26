@@ -122,7 +122,8 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                             // tags come in will be different each time the function is ran. As a
                             // new hashmap is created each time the function executes.
                             if !app.config_file_updated {
-                                app.display = prepare_tag_for_display(&app.activity.tag[..]);
+                                app.display_ready_tags =
+                                    prepare_tag_for_display(&app.activity.tag[..]);
                                 app.config_file_updated = true;
                             }
 
@@ -134,11 +135,14 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                             }
 
                             ui.add(DropDownBox::from_iter(
-                                &app.display.clone().into_keys().collect::<Vec<String>>(),
+                                &app.display_ready_tags
+                                    .clone()
+                                    .into_keys()
+                                    .collect::<Vec<String>>(),
                                 "tags",
                                 &mut app.tag,
                                 |ui, text| {
-                                    let index = app.display.get(text).unwrap()[0];
+                                    let index = app.display_ready_tags.get(text).unwrap()[0];
                                     app.color = app.activity.color[index];
                                     ui.selectable_label(false, text)
                                 },
@@ -312,7 +316,7 @@ fn activity_listing(
                         let label = Label::new(text).sense(Sense::click());
                         let r = ui.add(label);
                         r.context_menu(|ui| {
-                            app.assign_tag(ui, name, index);
+                            app.assign_tag(ui, &tag, index);
                             if tag != EMPTY_TAG.to_string() {
                                 app.delete_tag(ui, tag, index);
                             }
