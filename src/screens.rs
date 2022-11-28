@@ -121,10 +121,10 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                             // HashMaps keep items based on keys and not indexes, the order the
                             // tags come in will be different each time the function is ran. As a
                             // new hashmap is created each time the function executes.
-                            if !app.config_file_updated {
+                            if app.config_file_updated {
                                 app.display_ready_tags =
                                     prepare_tag_for_display(&app.activity.tag[..]);
-                                app.config_file_updated = true;
+                                app.config_file_updated = false;
                             }
 
                             // This is needed for when a tag is delete. Since an empty tag is two
@@ -142,8 +142,12 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                                 "tags",
                                 &mut app.tag,
                                 |ui, text| {
-                                    let index = app.display_ready_tags.get(text).unwrap()[0];
-                                    app.color = app.activity.color[index];
+                                    // Necessary for when all tags are deleted as the program is
+                                    // running.
+                                    if let Some(index) = app.display_ready_tags.get(text) {
+                                        let index = index[0];
+                                        app.color = app.activity.color[index];
+                                    }
                                     ui.selectable_label(false, text)
                                 },
                             ))
@@ -316,7 +320,7 @@ fn activity_listing(
                         let label = Label::new(text).sense(Sense::click());
                         let r = ui.add(label);
                         r.context_menu(|ui| {
-                            app.assign_tag(ui, &tag, index);
+                            app.assign_tag(ctx, ui, &tag, index);
                             if tag != EMPTY_TAG.to_string() {
                                 app.delete_tag(ui, tag, index);
                             }

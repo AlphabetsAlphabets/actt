@@ -9,7 +9,7 @@ use std::{
 };
 
 use dirs::config_dir;
-use egui::Color32;
+use egui::{Color32, Context};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -44,7 +44,7 @@ pub struct App {
     #[serde(skip)]
     pub new_name: String,
     #[serde(skip)]
-    pub target_index: usize,
+    pub target_name_index: usize,
 
     // This group of tags is used in the `activity_history` function.
     // This is used when the user wishes to create a new tag and assign it
@@ -56,12 +56,14 @@ pub struct App {
     #[serde(skip)]
     pub target_tag: String,
     #[serde(skip)]
+    pub target_tag_index: usize,
+    #[serde(skip)]
     pub show_color_picker: bool,
 
     #[serde(skip)]
     pub display_ready_tags: HashMap<String, Vec<usize>>,
 
-    // Miscelanious. Ungrouped fields that don't belong to a particular group.
+    // Misc. Ungrouped fields that don't belong to a particular group.
     #[serde(skip)]
     pub screen: Screen,
     #[serde(skip)]
@@ -94,7 +96,7 @@ impl Default for App {
             tag: "".to_string(),
 
             config_file: config_file.to_path_buf(),
-            config_file_updated: false,
+            config_file_updated: true,
             activity: Activity::default(),
 
             total_pause_time: Duration::from_secs(0),
@@ -104,10 +106,11 @@ impl Default for App {
 
             show_name_assign_dialog: false,
             new_name: "".to_string(),
-            target_index: usize::MAX,
+            target_name_index: usize::MAX,
 
             show_tag_assign_dialog: false,
             target_tag: "".to_string(),
+            target_tag_index: 0,
             new_tag: "".to_string(),
             show_color_picker: false,
 
@@ -140,7 +143,7 @@ impl App {
 
     /// Assign a new name to an activity
     pub fn assign_name(&mut self, ui: &mut egui::Ui, name: &String, index: usize) {
-        let same_index = self.target_index != usize::MAX && index == self.target_index;
+        let same_index = self.target_name_index != usize::MAX && index == self.target_name_index;
 
         if self.show_name_assign_dialog && same_index {
             let r = ui.text_edit_singleline(&mut self.new_name);
@@ -159,28 +162,32 @@ impl App {
                 }
                 self.show_name_assign_dialog = false;
                 self.focus = false;
-                self.target_index = usize::MAX;
+                self.target_name_index = usize::MAX;
             } else if lost_focus {
                 self.show_name_assign_dialog = false;
                 self.focus = false;
-                self.target_index = usize::MAX;
+                self.target_name_index = usize::MAX;
             }
         } else {
             let btn = egui::Button::new(name).frame(false);
             if ui.add(btn).clicked() {
-                self.target_index = index;
+                self.target_name_index = index;
                 self.show_name_assign_dialog = true;
             };
         }
     }
 
     /// Used to create new tags or change name of current tag
-    pub fn assign_tag(&mut self, ui: &mut egui::Ui, tag: &String, index: usize) {
+    pub fn assign_tag(&mut self, ctx: &Context, ui: &mut egui::Ui, tag: &String, index: usize) {
         // TODO: Turn this into a window instead. To do two things.
-        // 1. Assign tag as usual.
+        // 1. Assign/Change tag as usual. When changing tags, only the *specific* tag is changed.
+        //    Everything else remains the same. It just makes more sense. Changing multiple tags is
+        //    with the check boxes.
         // 2. Pick a color for a tag.
         // Reason being that when you delete a tag, you can't reassign a color.
-        if self.show_tag_assign_dialog && *tag == self.target_tag {
+        if self.activity.color[index] == Color32::TRANSPARENT {
+            self.assign_tag_after_deletion(ctx, ui);
+        } else if self.show_tag_assign_dialog && index == self.target_tag_index {
             let text_edit = ui.text_edit_singleline(&mut self.new_tag);
             if !self.focus {
                 text_edit.request_focus();
@@ -191,10 +198,16 @@ impl App {
             let key_pressed = |key: egui::Key| ui.input().key_pressed(key);
 
             if lost_focus && key_pressed(egui::Key::Enter) {
-                for tag in self.activity.tag.iter_mut() {
-                    if *tag == self.target_tag {
-                        *tag = self.new_tag.clone();
-                    }
+                self.activity.tag[index] = self.new_tag.clone();
+
+                // This check is to see if there are any clashing colors. When renaming a tag, a
+                // new color must be chosen. I can go three routes.
+                // 1. Ask the user what color is to be chosen.
+                // 2. The color is randomly assigned.
+                // 3. Implement both (a preference to be set in the options menu).
+                let colors = self.activity.color.clone();
+                if let Some(cur_tag_color) = self.activity.color.get_mut(index) {
+                    if colors.contains(&cur_tag_color) {}
                 }
 
                 self.write_config_file();
@@ -205,16 +218,31 @@ impl App {
             } else if text_edit.lost_focus() {
                 self.show_tag_assign_dialog = false;
                 self.focus = false;
+
                 ui.close_menu();
             }
         } else {
             let btn = egui::Button::new("Change/Assign tag").frame(false);
             if ui.add(btn).clicked() {
+                self.target_tag_index = index;
                 self.target_tag = tag.clone();
-                println!("{:#?}", self.target_tag);
                 self.show_tag_assign_dialog = true;
             };
         }
+    }
+
+    /// color - Check if the color exists.
+    /// Returns a new color that is unique. If `color` is unique, returns `color`.
+    pub fn does_color_exist(&self, color: &Color32) -> Color32 {
+        if self.activity.color.contains(&color) {
+            // Randomly create 3, 3 digit numbers.
+        }
+
+        color.clone()
+    }
+
+    pub fn assign_tag_after_deletion(&mut self, ctx: &Context, ui: &mut egui::Ui) {
+        egui::Window::new("Title").show(ctx, |ui| ui.label("Hello"));
     }
 
     /// target_tag: The tag that is to be deleted.
