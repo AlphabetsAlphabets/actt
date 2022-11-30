@@ -16,12 +16,18 @@ use egui::{
 use egui_dropdown::DropDownBox;
 use serde::{Deserialize, Serialize};
 
+// When a new field is added remember to add the change in the delete logic.
+// This also applies to the stop logic for adding entries to the config file.
 #[derive(Deserialize, Serialize, Default)]
 pub struct Activity {
+    // Activity entry
     pub name: Vec<String>,
     total_time: Vec<Duration>,
     pub color: Vec<Color32>,
     pub tag: Vec<String>,
+
+    // User preferences
+    tag_assign_behavior: String,
 }
 
 impl Debug for Activity {
@@ -225,6 +231,7 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
 
             ui.columns(2, |columns| {
                 if columns[0].button("Stop").clicked() {
+                    // Logic for adding entries to the config file.
                     app.screen = Screen::History;
                     match app.pause_time {
                         Some(pause_time) => {
@@ -238,17 +245,20 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                         _ => (),
                     }
 
+                    // TODO: Find a way to make checks for if preferences were changed
                     let mut act = app.read_config_file();
                     if act.name.len() == 0 {
                         act.name = vec![app.activity_name.clone()];
                         act.total_time = vec![app.total_time.unwrap().elapsed()];
                         act.tag = vec![app.tag.clone()];
                         act.color = vec![app.color];
+                        act.tag_assign_behavior = app.tag_assign_behavior.clone();
                     } else {
                         act.name.push(app.activity_name.clone());
                         act.total_time.push(app.total_time.unwrap().elapsed());
                         act.tag.push(app.tag.clone());
                         act.color.push(app.color);
+                        act.tag_assign_behavior = app.tag_assign_behavior.clone();
                     }
 
                     app.activity = act;
@@ -342,17 +352,11 @@ fn activity_listing(
                         if ui.button("X").clicked() {
                             app.activity = app.read_config_file();
 
-                            let Activity {
-                                name,
-                                total_time,
-                                color,
-                                tag,
-                            } = &mut app.activity;
-
-                            name.remove(index);
-                            total_time.remove(index);
-                            tag.remove(index);
-                            color.remove(index);
+                            app.activity.name.remove(index);
+                            app.activity.total_time.remove(index);
+                            app.activity.tag.remove(index);
+                            app.activity.color.remove(index);
+                            app.activity.tag_assign_behavior = app.tag_assign_behavior.clone();
 
                             app.write_config_file();
                         }

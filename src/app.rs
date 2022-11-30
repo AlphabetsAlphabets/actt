@@ -64,6 +64,15 @@ pub struct App {
     #[serde(skip)]
     pub display_ready_tags: HashMap<String, Vec<usize>>,
 
+    // User preferences
+    /// Can be either `"random"` (default) or `"choice"`.
+    /// `"random"` -  Assign a random color to avoid the clash. Which means only a text edit to change the name of the tag will appear.
+    /// `"choice"` A window pops up containing a text edit asking for the user to input a new tag name, along with a color picker to change the name of the tag.  
+    ///
+    /// This is needed when a tag is renamed and the color of the tag already exists.
+    /// It occurs when there are a group of activities with the same tag, and one of them has their tag changed.
+    pub tag_assign_behavior: String,
+
     // Misc. Ungrouped fields that don't belong to a particular group.
     #[serde(skip)]
     pub screen: Screen,
@@ -149,6 +158,9 @@ impl Default for App {
             show_color_picker: false,
 
             display_ready_tags: HashMap::default(),
+
+            // user preferences
+            tag_assign_behavior: "random".to_string(),
 
             screen: Screen::Start,
             warning: None,
@@ -239,10 +251,14 @@ impl App {
                 // 1. Ask the user what color is to be chosen.
                 // 2. The color is randomly assigned.
                 // 3. Implement both (a preference to be set in the options menu).
+
+                // Randomly assigns a tag color if two tags with the same color exists.
                 let Self { activity, .. } = self;
                 let Activity { color: colors, .. } = activity;
-                if let Some(cur_color) = colors.get(index) {
-                    activity.color[index] = does_color_exist(&colors, cur_color, None);
+                if self.tag_assign_behavior == "random" {
+                    if let Some(cur_color) = colors.get(index) {
+                        colors[index] = does_color_exist(&colors, cur_color, None);
+                    }
                 }
 
                 self.write_config_file();
