@@ -1,6 +1,6 @@
 use crate::constants::*;
 use crate::screens::{Activity, Screen, *};
-use rand::Rng;
+use rand::{random, Rng};
 
 use std::{
     collections::HashMap,
@@ -257,7 +257,9 @@ impl App {
                 let Activity { color: colors, .. } = activity;
                 if self.tag_assign_behavior == "random" {
                     if let Some(cur_color) = colors.get(index) {
-                        colors[index] = does_color_exist(&colors, cur_color, None);
+                        if does_color_exist(&colors, cur_color) {
+                            colors[index] = random_color(&colors, cur_color, None);
+                        }
                     }
                 }
 
@@ -308,17 +310,25 @@ impl App {
     }
 }
 
-fn does_color_exist(colors: &[Color32], color: &Color32, count: Option<usize>) -> Color32 {
+fn does_color_exist(colors: &[Color32], color: &Color32) -> bool {
+    if colors.contains(&color) {
+        true
+    } else {
+        false
+    }
+}
+
+fn random_color(colors: &[Color32], color: &Color32, count: Option<usize>) -> Color32 {
     let limit = 255 ^ 3;
     let count = count.unwrap_or(0) + 1;
     let limit_not_reached = !(limit == count);
 
-    if colors.contains(&color) && limit_not_reached {
+    if limit_not_reached {
         let r = rand::thread_rng().gen_range(0..=255);
         let g = rand::thread_rng().gen_range(0..=255);
         let b = rand::thread_rng().gen_range(0..=255);
 
-        does_color_exist(colors, &Color32::from_rgb(r, g, b), Some(count))
+        random_color(colors, &Color32::from_rgb(r, g, b), Some(count))
     } else {
         color.clone()
     }
