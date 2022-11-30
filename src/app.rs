@@ -1,5 +1,6 @@
 use crate::constants::*;
 use crate::screens::{Activity, Screen, *};
+use rand::Rng;
 
 use std::{
     collections::HashMap,
@@ -73,6 +74,39 @@ pub struct App {
     pub color: Color32,
     #[serde(skip)]
     pub focus: bool,
+}
+
+impl App {
+    /// Called once before the first frame.
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        // This is also where you can customized the look at feel of egui using
+        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
+
+        // Load previous app state (if any).
+        // Note that you must enable the `persistence` feature for this to work.
+        if let Some(storage) = cc.storage {
+            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+        }
+
+        Default::default()
+    }
+}
+
+impl eframe::App for App {
+    /// Called by the frame work to save state before shutdown.
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        eframe::set_value(storage, eframe::APP_KEY, self);
+    }
+
+    /// Called each time the UI needs repainting, which may be many times per second.
+    /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        match self.screen {
+            Screen::Start => start_screen(self, ctx, _frame),
+            Screen::Tracking | Screen::Pause => tracking_screen(self, ctx, _frame),
+            Screen::History => history_screen(self, ctx, _frame),
+        }
+    }
 }
 
 impl Default for App {
@@ -205,9 +239,10 @@ impl App {
                 // 1. Ask the user what color is to be chosen.
                 // 2. The color is randomly assigned.
                 // 3. Implement both (a preference to be set in the options menu).
-                let colors = self.activity.color.clone();
-                if let Some(cur_tag_color) = self.activity.color.get_mut(index) {
-                    if colors.contains(&cur_tag_color) {}
+                let Self { activity, .. } = self;
+                let Activity { color: colors, .. } = activity;
+                if let Some(cur_color) = colors.get(index) {
+                    activity.color[index] = does_color_exist(&colors, cur_color, None);
                 }
 
                 self.write_config_file();
@@ -233,14 +268,6 @@ impl App {
 
     /// color - Check if the color exists.
     /// Returns a new color that is unique. If `color` is unique, returns `color`.
-    pub fn does_color_exist(&self, color: &Color32) -> Color32 {
-        if self.activity.color.contains(&color) {
-            // Randomly create 3, 3 digit numbers.
-        }
-
-        color.clone()
-    }
-
     pub fn assign_tag_after_deletion(&mut self, ctx: &Context, ui: &mut egui::Ui) {
         egui::Window::new("Title").show(ctx, |ui| ui.label("Hello"));
     }
@@ -263,35 +290,20 @@ impl App {
             ui.close_menu();
         }
     }
-
-    /// Called once before the first frame.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // This is also where you can customized the look at feel of egui using
-        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
-
-        // Load previous app state (if any).
-        // Note that you must enable the `persistence` feature for this to work.
-        if let Some(storage) = cc.storage {
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
-        }
-
-        Default::default()
-    }
 }
 
-impl eframe::App for App {
-    /// Called by the frame work to save state before shutdown.
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, eframe::APP_KEY, self);
-    }
+fn does_color_exist(colors: &[Color32], color: &Color32, count: Option<usize>) -> Color32 {
+    let limit = 255 ^ 3;
+    let count = count.unwrap_or(0) + 1;
+    let limit_not_reached = !(limit == count);
 
-    /// Called each time the UI needs repainting, which may be many times per second.
-    /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        match self.screen {
-            Screen::Start => start_screen(self, ctx, _frame),
-            Screen::Tracking | Screen::Pause => tracking_screen(self, ctx, _frame),
-            Screen::History => history_screen(self, ctx, _frame),
-        }
+    if colors.contains(&color) && limit_not_reached {
+        let r = rand::thread_rng().gen_range(0..=255);
+        let g = rand::thread_rng().gen_range(0..=255);
+        let b = rand::thread_rng().gen_range(0..=255);
+
+        does_color_exist(colors, &Color32::from_rgb(r, g, b), Some(count))
+    } else {
+        color.clone()
     }
 }
