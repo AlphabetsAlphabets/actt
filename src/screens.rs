@@ -354,7 +354,6 @@ fn activity_listing(
 
                             app.activity.name.remove(index);
                             app.activity.total_time.remove(index);
-                            app.activity.tag.remove(index);
                             app.activity.color.remove(index);
                             app.activity.tag_assign_behavior = app.tag_assign_behavior.clone();
 
