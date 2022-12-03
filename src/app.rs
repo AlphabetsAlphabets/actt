@@ -17,7 +17,7 @@ use egui::{Color32, Context};
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct App {
     pub activity_name: String,
-    pub tag: String,
+    pub tag_name: String,
 
     #[serde(skip)]
     pub config_file: PathBuf,
@@ -136,7 +136,7 @@ impl Default for App {
 
         Self {
             activity_name: "".to_string(),
-            tag: "".to_string(),
+            tag_name: "".to_string(),
 
             config_file: config_file.to_path_buf(),
             config_file_updated: true,
@@ -203,7 +203,7 @@ impl App {
 
             if lost_focus && key_pressed(egui::Key::Enter) {
                 if !self.new_name.trim().is_empty() {
-                    self.activity.name[index] = self.new_name.clone();
+                    self.activity.entry[index].name = self.new_name.clone();
                     self.write_config_file();
                 }
                 self.show_name_assign_dialog = false;
@@ -231,7 +231,7 @@ impl App {
         //    with the check boxes.
         // 2. Pick a color for a tag.
         // Reason being that when you delete a tag, you can't reassign a color.
-        if self.activity.color[index] == Color32::TRANSPARENT {
+        if self.activity.colors[index] == Color32::TRANSPARENT {
             self.assign_tag_after_deletion(ctx, ui);
         } else if self.show_tag_assign_dialog && index == self.target_tag_index {
             let text_edit = ui.text_edit_singleline(&mut self.new_tag);
@@ -244,7 +244,7 @@ impl App {
             let key_pressed = |key: egui::Key| ui.input().key_pressed(key);
 
             if lost_focus && key_pressed(egui::Key::Enter) {
-                self.activity.tag[index] = self.new_tag.clone();
+                // TODO: This needs to be reworked to accomodate changes in the config file.
 
                 // This check is to see if there are any clashing colors. When renaming a tag, a
                 // new color must be chosen. I can go three routes.
@@ -254,7 +254,7 @@ impl App {
 
                 // Randomly assigns a tag color if two tags with the same color exists.
                 let Self { activity, .. } = self;
-                let Activity { color: colors, .. } = activity;
+                let Activity { colors, .. } = activity;
                 if self.tag_assign_behavior == "random" {
                     if let Some(cur_color) = colors.get(index) {
                         if does_color_exist(&colors, cur_color) {
@@ -293,20 +293,37 @@ impl App {
     /// target_tag: The tag that is to be deleted.
     pub fn delete_tag(&mut self, ui: &mut egui::Ui, target_tag: String, index: usize) {
         let btn = egui::Button::new("Delete tag").frame(false);
-        if ui.add(btn).clicked() {
-            for tag in self.activity.tag.iter_mut() {
-                if *tag == target_tag {
-                    // Sets the tag to an empty tag. Which signifies "deleted".
-                    *tag = EMPTY_TAG.to_string();
-                    if let Some(color) = self.activity.color.get_mut(index) {
-                        *color = DEFAULT_TAG_COLOR;
-                    }
-                }
-            }
+        // FIXME: delete_tag
+        // if ui.add(btn).clicked() {
+        //     for tag in self.activity.tag.iter_mut() {
+        //         if *tag == target_tag {
+        //             // Sets the tag to an empty tag. Which signifies "deleted".
+        //             *tag = EMPTY_TAG.to_string();
+        //             if let Some(color) = self.activity.color.get_mut(index) {
+        //                 *color = DEFAULT_TAG_COLOR;
+        //             }
+        //         }
+        //     }
 
-            self.write_config_file();
-            ui.close_menu();
+        // self.write_config_file();
+        ui.close_menu();
+        // }
+    }
+
+    pub fn does_tag_exist(&self, tag_list: &[String], cur_tag: &String) -> bool {
+        if tag_list.contains(cur_tag) {
+            true
+        } else {
+            false
         }
+    }
+
+    pub fn find_tag(&self, tag_list: &[String], tag_to_find: &String) -> usize {
+        tag_list.iter().position(|e| e == tag_to_find).unwrap()
+    }
+
+    pub fn find_color(&self, colors: &[Color32], color_to_find: &Color32) -> usize {
+        colors.iter().position(|e| e == color_to_find).unwrap()
     }
 }
 
