@@ -2,6 +2,7 @@ use crate::colors::*;
 use crate::constants::*;
 use crate::App;
 
+use std::hash::Hash;
 use std::{
     collections::HashMap,
     fmt::{self, Debug},
@@ -16,31 +17,40 @@ use egui::{
 use egui_dropdown::DropDownBox;
 use serde::{Deserialize, Serialize};
 
+#[derive(Deserialize, Serialize, Default)]
+pub struct Entry {
+    pub name: String,
+    pub tag_index: usize,
+    pub color_index: usize,
+}
+
+impl Entry {
+    fn new(name: String, tag_index: usize, color_index: usize) -> Self {
+        Self {
+            name,
+            tag_index,
+            color_index,
+        }
+    }
+}
+
 // When a new field is added remember to add the change in the delete logic.
 // This also applies to the stop logic for adding entries to the config file.
 #[derive(Deserialize, Serialize, Default)]
 pub struct Activity {
     // Activity entry
-    pub name: Vec<String>,
+    pub entry: Vec<Entry>,
     total_time: Vec<Duration>,
-    pub color: Vec<Color32>,
-    pub tag: Vec<String>,
+    pub tag_list: Vec<String>,
+    pub colors: Vec<Color32>,
 
     // User preferences
     tag_assign_behavior: String,
 }
 
-impl Debug for Activity {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // name: <name> #<tag> @ <time>
-        for (index, name) in self.name.iter().enumerate() {
-            let time = &self.total_time[index].as_secs();
-            let tag = &self.tag[index];
-
-            writeln!(f, "Name: {} #{} - {}s", name, tag, time)?;
-        }
-
-        Ok(())
+impl Activity {
+    pub fn get_tags(&self) -> Vec<String> {
+        self.tag_list.clone()
     }
 }
 
@@ -79,7 +89,7 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
 
             let mut act = app.read_config_file();
 
-            if act.name.len() == 0 {
+            if act.entry.len() == 0 {
                 ui.label("It's empty!");
             } else {
                 activity_listing(app, &mut act, ctx, _frame, ui);
@@ -122,42 +132,22 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                     ui.columns(2, |column| {
                         column[0].vertical_centered_justified(|ui| ui.label("Tag"));
                         column[1].vertical_centered_justified(|ui| {
-                            // This is to stop the tags listed in the combox to keep flipping.
-                            // Without the if statement, this function would run everytime. Since
-                            // HashMaps keep items based on keys and not indexes, the order the
-                            // tags come in will be different each time the function is ran. As a
-                            // new hashmap is created each time the function executes.
-                            if app.config_file_updated {
-                                app.display_ready_tags =
-                                    prepare_tag_for_display(&app.activity.tag[..]);
-                                app.config_file_updated = false;
-                            }
-
                             // This is needed for when a tag is delete. Since an empty tag is two
                             // blank spaces, in the tag text edit there will be two spaces
                             // inserted. This is a fix for it.
-                            if app.tag == EMPTY_TAG {
-                                app.tag = "".to_string();
+                            if app.tag_name == EMPTY_TAG {
+                                app.tag_name = "".to_string();
                             }
 
                             ui.add(DropDownBox::from_iter(
-                                &app.display_ready_tags
-                                    .clone()
-                                    .into_keys()
-                                    .collect::<Vec<String>>(),
+                                &app.activity.tag_list.clone(),
                                 "tags",
-                                &mut app.tag,
-                                |ui, text| {
-                                    // Necessary for when all tags are deleted as the program is
-                                    // running.
-                                    if let Some(index) = app.display_ready_tags.get(text) {
-                                        let index = index[0];
-                                        app.color = app.activity.color[index];
-                                    }
-                                    ui.selectable_label(false, text)
-                                },
+                                &mut app.tag_name,
+                                |ui, text| ui.selectable_label(false, text),
                             ))
                             .on_hover_text("What category is this activity under?");
+
+                            // use `app.tag_name` to work the automatic color thing.
                         });
                     });
 
@@ -175,8 +165,8 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                 if app.activity_name.len() <= 0 {
                     app.warning = Some("Activity name cannot be empty!".to_string());
                 } else {
-                    if app.tag.is_empty() {
-                        app.tag = EMPTY_TAG.to_string();
+                    if app.tag_name.is_empty() {
+                        app.tag_name = EMPTY_TAG.to_string();
                     }
 
                     app.warning = None;
@@ -247,19 +237,32 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
 
                     // TODO: Find a way to make checks for if preferences were changed
                     let mut act = app.read_config_file();
-                    if act.name.len() == 0 {
-                        act.name = vec![app.activity_name.clone()];
-                        act.total_time = vec![app.total_time.unwrap().elapsed()];
-                        act.tag = vec![app.tag.clone()];
-                        act.color = vec![app.color];
-                        act.tag_assign_behavior = app.tag_assign_behavior.clone();
-                    } else {
-                        act.name.push(app.activity_name.clone());
+                    act.total_time.push(app.total_time.unwrap().elapsed());
+
+                    if app.does_tag_exist(&act.tag_list, &app.tag_name) {
+                        let existing_tag_index = app.find_tag(&act.tag_list, &app.tag_name);
+                        let existing_color_index = app.find_color(&act.colors, &app.color);
+                        let new_entry = Entry::new(
+                            app.activity_name.clone(),
+                            existing_tag_index,
+                            existing_color_index,
+                        );
+                        act.entry.push(new_entry);
                         act.total_time.push(app.total_time.unwrap().elapsed());
-                        act.tag.push(app.tag.clone());
-                        act.color.push(app.color);
-                        act.tag_assign_behavior = app.tag_assign_behavior.clone();
+                    } else {
+                        act.colors.push(app.color.clone());
+                        let new_color_index = act.colors.len() - 1;
+                        act.total_time.push(app.total_time.unwrap().elapsed());
+
+                        let new_tag_index = act.tag_list.len();
+                        let entry =
+                            Entry::new(app.activity_name.clone(), new_tag_index, new_color_index);
+                        act.entry.push(entry);
+
+                        act.tag_list.push(app.tag_name.clone());
                     }
+
+                    act.tag_assign_behavior = app.tag_assign_behavior.clone();
 
                     app.activity = act;
                     app.write_config_file();
@@ -311,13 +314,21 @@ fn activity_listing(
                 column[1].vertical_centered_justified(|ui| ui.label(blue_text("Tag")));
                 column[2].vertical_centered_justified(|ui| ui.label(blue_text("Time spent")));
                 column[3].vertical_centered_justified(|ui| ui.label(red_text("Delete")));
-            });
 
-            for (index, name) in act.name.iter().enumerate() {
-                ui.columns(4, |column| {
-                    let tag = act.tag[index].clone();
-                    app.tag = tag.clone();
-                    let total_time = &act.total_time[index].as_secs();
+                let Activity {
+                    total_time,
+                    tag_list,
+                    colors,
+                    ..
+                } = act;
+
+                for (index, entry) in act.entry.iter().enumerate() {
+                    let total_time = total_time[index].as_secs();
+                    let Entry {
+                        name,
+                        tag_index,
+                        color_index,
+                    } = entry;
 
                     // Name
                     column[0].vertical_centered_justified(|ui| {
@@ -326,13 +337,14 @@ fn activity_listing(
 
                     // Tag
                     column[1].vertical_centered_justified(|ui| {
-                        let text = RichText::new(app.tag.clone()).color(act.color[index]);
+                        let cur_tag = &tag_list[*tag_index].trim().to_string();
+                        let text = RichText::new(cur_tag.clone()).color(colors[*color_index]);
                         let label = Label::new(text).sense(Sense::click());
                         let r = ui.add(label);
                         r.context_menu(|ui| {
-                            app.assign_tag(ctx, ui, &tag, index);
-                            if tag != EMPTY_TAG.to_string() {
-                                app.delete_tag(ui, tag, index);
+                            app.assign_tag(ctx, ui, cur_tag, index);
+                            if app.tag_name != EMPTY_TAG.to_string() {
+                                app.delete_tag(ui, cur_tag.clone(), index)
                             }
                         });
                     });
@@ -347,35 +359,19 @@ fn activity_listing(
                     // Total time
                     column[2].vertical_centered_justified(|ui| ui.label(total_time));
 
-                    // Delete
                     column[3].vertical_centered_justified(|ui| {
                         if ui.button("X").clicked() {
-                            app.activity = app.read_config_file();
-
-                            app.activity.name.remove(index);
-                            app.activity.total_time.remove(index);
-                            app.activity.color.remove(index);
+                            app.activity.entry.remove(index);
                             app.activity.tag_assign_behavior = app.tag_assign_behavior.clone();
-
                             app.write_config_file();
                         }
                     });
-                });
-            }
+                }
+
+                // Delete
+            });
         });
     });
 
     ctx.request_repaint();
-}
-
-fn prepare_tag_for_display(tags: &[String]) -> HashMap<String, Vec<usize>> {
-    let mut map: HashMap<String, Vec<usize>> = HashMap::new();
-
-    for (index, tag) in tags.iter().enumerate() {
-        map.entry(tag.clone())
-            .and_modify(|v| v.push(index))
-            .or_insert(vec![index]);
-    }
-
-    map
 }
