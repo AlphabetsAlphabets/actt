@@ -1,17 +1,17 @@
+use crate::app;
 use crate::colors::*;
 use crate::constants::*;
 use crate::App;
 
 use std::time::{Duration, Instant};
 
+use egui::Button;
 use egui::{
     color_picker::{color_picker_color32, Alpha},
-    Color32, Label, RichText, ScrollArea, Sense, Ui, Vec2,
+    Color32, RichText, ScrollArea, Ui, Vec2,
 };
 
 use egui_dropdown::DropDownBox;
-use rand::random;
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Default)]
@@ -31,21 +31,27 @@ impl Entry {
     }
 }
 
+#[derive(Deserialize, Serialize, Default)]
+struct Preferences {
+    /// Can be `"random"` (default), or `"picker"`.
+    /// - `random` - A color is assigned at random when there are matching colors.
+    /// - `picker` - A color wheel is shown to the user, allowing them to pick and choose a color.
+    tag_assign_behavior: String,
+}
+
 // When a new field is added remember to add the change in the delete logic.
 // This also applies to the stop logic for adding entries to the config file.
 #[derive(Deserialize, Serialize, Default)]
-pub struct Activity {
+pub struct Config {
     // Activity entry
     pub entry: Vec<Entry>,
     total_time: Vec<Duration>,
     pub tag_list: Vec<String>,
     pub colors: Vec<Color32>,
-
-    // User preferences
-    tag_assign_behavior: String,
+    preferences: Preferences,
 }
 
-impl Activity {
+impl Config {
     pub fn get_tags(&self) -> Vec<String> {
         self.tag_list.clone()
     }
@@ -84,12 +90,12 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
             ui.label("A history of all your activities, and how long you've spent on each one!");
             ui.separator();
 
-            let mut act = app.read_config_file();
+            let mut config = app.read_config_file();
 
-            if act.entry.len() == 0 {
+            if config.entry.len() == 0 {
                 ui.label("It's empty!");
             } else {
-                activity_listing(app, &mut act, ctx, _frame, ui);
+                activity_listing(app, &mut config, ctx, _frame, ui);
             }
         });
     });
@@ -100,7 +106,7 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
     // There's nothing wrong with the return type. It's just that `CentralPanel` is also a function
     // Which means that the return type needs to cover that as well.
     egui::CentralPanel::default().show(ctx, |ui| {
-        app.activity = app.read_config_file();
+        app.config = app.read_config_file();
 
         horizontal_menu(app, ui);
         ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
@@ -139,23 +145,21 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                             let tag_name = app.tag_name.clone();
 
                             ui.add(DropDownBox::from_iter(
-                                &app.activity.tag_list.clone(),
+                                &app.config.tag_list.clone(),
                                 "tags",
                                 &mut app.tag_name,
                                 |ui, text| {
-                                    let tag_list = &mut app.activity.tag_list;
+                                    let tag_list = &mut app.config.tag_list;
                                     let mut tag_list_iter = tag_list.iter_mut();
                                     if let Some(color_index) =
                                         tag_list_iter.position(|e| *e == tag_name)
                                     {
-                                        app.color = app.activity.colors[color_index];
+                                        app.color = app.config.colors[color_index];
                                     }
                                     ui.selectable_label(false, text)
                                 },
                             ))
                             .on_hover_text("What category is this activity under?");
-
-                            // use `app.tag_name` to work the automatic color thing.
                         });
                     });
 
@@ -172,6 +176,11 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
             if ui.button("Start").clicked() {
                 if app.activity_name.len() <= 0 {
                     app.warning = Some("Activity name cannot be empty!".to_string());
+                } else if app.config.preferences.tag_assign_behavior == "picker" {
+                    app.warning = Some(
+                        "Please pick a different color, that one has already been chosen."
+                            .to_string(),
+                    );
                 } else {
                     if app.tag_name.is_empty() {
                         app.tag_name = EMPTY_TAG.to_string();
@@ -242,47 +251,46 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                     }
 
                     // TODO: Find a way to make checks for if preferences were changed
-                    let mut act = app.read_config_file();
-                    act.total_time.push(app.total_time.unwrap().elapsed());
+                    let mut config = app.read_config_file();
+                    config.total_time.push(app.total_time.unwrap().elapsed());
 
-                    if app.does_tag_exist(&act.tag_list, &app.tag_name) {
-                        let existing_tag_index = app.find_tag(&act.tag_list, &app.tag_name);
-                        let mut color_index = app.find_color(&act.colors, &app.color);
+                    if app.does_tag_exist(&config.tag_list, &app.tag_name) {
+                        let existing_tag_index = app.find_tag(&config.tag_list, &app.tag_name);
+                        let mut color_index = app.find_color(&config.colors, &app.color);
 
                         if color_index == usize::MAX {
-                            act.colors.push(app.color.clone());
-                            color_index = act.colors.len() - 1;
+                            config.colors.push(app.color.clone());
+                            color_index = config.colors.len() - 1;
                         }
 
                         let new_entry =
                             Entry::new(app.activity_name.clone(), existing_tag_index, color_index);
-                        act.entry.push(new_entry);
-                        act.total_time.push(app.total_time.unwrap().elapsed());
+                        config.entry.push(new_entry);
+                        config.total_time.push(app.total_time.unwrap().elapsed());
                     } else {
                         // If true means a color already exists. There can't be clashing colors for
                         // tags. Therefore a random one will be assigned.
-                        if app.activity.tag_assign_behavior == "random" {
-                            if app.find_color(&act.colors, &app.color) != usize::MAX {
-                                use crate::app;
-                                app.color = app::random_color(&act.colors, &app.color, None);
+                        if app.config.preferences.tag_assign_behavior == "random" {
+                            if app.find_color(&config.colors, &app.color) != usize::MAX {
+                                app.color = app::random_color(&config.colors, &app.color, None);
                             }
                         }
 
-                        act.colors.push(app.color.clone());
-                        let new_color_index = act.colors.len() - 1;
-                        act.total_time.push(app.total_time.unwrap().elapsed());
+                        config.colors.push(app.color.clone());
+                        let new_color_index = config.colors.len() - 1;
+                        config.total_time.push(app.total_time.unwrap().elapsed());
 
-                        let new_tag_index = act.tag_list.len();
+                        let new_tag_index = config.tag_list.len();
                         let entry =
                             Entry::new(app.activity_name.clone(), new_tag_index, new_color_index);
-                        act.entry.push(entry);
+                        config.entry.push(entry);
 
-                        act.tag_list.push(app.tag_name.clone());
+                        config.tag_list.push(app.tag_name.clone());
                     }
 
-                    act.tag_assign_behavior = app.tag_assign_behavior.clone();
+                    config.preferences.tag_assign_behavior = app.tag_assign_behavior.clone();
 
-                    app.activity = act;
+                    app.config = config;
                     app.write_config_file();
 
                     app.pause_time = None;
@@ -319,7 +327,7 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
 
 fn activity_listing(
     app: &mut App,
-    act: &mut Activity,
+    config: &mut Config,
     ctx: &egui::Context,
     _frame: &mut eframe::Frame,
     ui: &mut Ui,
@@ -333,14 +341,14 @@ fn activity_listing(
                 column[2].vertical_centered_justified(|ui| ui.label(blue_text("Time spent")));
                 column[3].vertical_centered_justified(|ui| ui.label(red_text("Delete")));
 
-                let Activity {
+                let Config {
                     total_time,
                     tag_list,
                     colors,
                     ..
-                } = act;
+                } = config;
 
-                for (index, entry) in act.entry.iter().enumerate() {
+                for (index, entry) in config.entry.iter().enumerate() {
                     let total_time = total_time[index].as_secs();
                     let Entry {
                         name,
@@ -357,31 +365,33 @@ fn activity_listing(
                     column[1].vertical_centered_justified(|ui| {
                         let current_tag = &tag_list[*tag_index].trim().to_string();
                         let text = RichText::new(current_tag.clone()).color(colors[*color_index]);
-                        let button = egui::Button::new(text).frame(false);
+                        let button = Button::new(text).frame(false);
                         let r = ui.add(button);
                         r.context_menu(|ui| {
-                            app.assign_tag(ctx, ui, current_tag, index);
-                            if app.tag_name != EMPTY_TAG.to_string() {
-                                app.delete_tag(ui, current_tag.clone(), index)
+                            let tag_modification_button =
+                                ui.add(Button::new("Change tag").frame(false));
+                            if tag_modification_button.clicked() {
+                                app.assign_tag(ctx, ui, current_tag, index);
+                                ui.close_menu();
                             }
+                            // app.delete_tag(ui, current_tag.clone(), index);
                         });
                     });
 
-                    let m = total_time / 60;
-                    let s = total_time % 60;
-                    let h = m / 60;
-                    let m = m % 60;
+                    let minutes = total_time / 60;
+                    let seconds = total_time % 60;
+                    let hours = minutes / 60;
+                    let minutes = minutes % 60;
 
-                    let total_time = format!("{}h {}m {}s", h, m, s);
+                    let total_time = format!("{}h {}m {}s", hours, minutes, seconds);
 
                     // Total time
                     column[2].vertical_centered_justified(|ui| ui.label(total_time));
 
                     column[3].vertical_centered_justified(|ui| {
                         if ui.button("X").clicked() {
-                            app.activity.entry.remove(index);
-                            app.activity.total_time.remove(index);
-                            app.activity.tag_assign_behavior = app.tag_assign_behavior.clone();
+                            app.config.entry.remove(index);
+                            app.config.total_time.remove(index);
                             app.write_config_file();
                         }
                     });

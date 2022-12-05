@@ -1,5 +1,5 @@
 use crate::constants::*;
-use crate::screens::{Activity, Screen, *};
+use crate::screens::{Config, Screen, *};
 use rand::{random, Rng};
 
 use std::{
@@ -10,7 +10,7 @@ use std::{
 };
 
 use dirs::config_dir;
-use egui::{Color32, Context};
+use egui::{Button, Color32, Context};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -25,7 +25,7 @@ pub struct App {
     #[serde(skip)]
     pub config_file_updated: bool,
     #[serde(skip)]
-    pub activity: Activity,
+    pub config: Config,
 
     // This isn't used but I plan to use it to show how much time you spent relaxing.
     // I'm unsure of the exact implementation details though. Cuz I'll have to go through the
@@ -140,7 +140,7 @@ impl Default for App {
 
             config_file: config_file.to_path_buf(),
             config_file_updated: true,
-            activity: Activity::default(),
+            config: Config::default(),
 
             total_pause_time: Duration::from_secs(0),
             pause_time: None,
@@ -173,17 +173,17 @@ impl Default for App {
 
 impl App {
     pub fn write_config_file(&mut self) {
-        let json = serde_json::to_string(&self.activity).unwrap();
+        let json = serde_json::to_string(&self.config).unwrap();
         fs::write(&self.config_file, json).unwrap();
         self.config_file_updated = true;
     }
 
-    pub fn read_config_file(&self) -> Activity {
+    pub fn read_config_file(&self) -> Config {
         let file = fs::read(&self.config_file).unwrap();
         let contents = std::str::from_utf8(&file[..]).unwrap();
         match serde_json::from_str(contents) {
             Ok(act) => act,
-            Err(_) => Activity::default(),
+            Err(_) => Config::default(),
         }
     }
 
@@ -203,7 +203,7 @@ impl App {
 
             if lost_focus && key_pressed(egui::Key::Enter) {
                 if !self.new_name.trim().is_empty() {
-                    self.activity.entry[index].name = self.new_name.clone();
+                    self.config.entry[index].name = self.new_name.clone();
                     self.write_config_file();
                 }
                 self.show_name_assign_dialog = false;
@@ -231,7 +231,8 @@ impl App {
         //    with the check boxes.
         // 2. Pick a color for a tag.
         // Reason being that when you delete a tag, you can't reassign a color.
-        if self.activity.colors[index] == Color32::TRANSPARENT {
+        // FIXME: WIll need to rework this whole thing.
+        if self.config.colors[index] == Color32::TRANSPARENT {
             self.assign_tag_after_deletion(ctx, ui);
         } else if self.show_tag_assign_dialog && index == self.target_tag_index {
             let text_edit = ui.text_edit_singleline(&mut self.new_tag);
@@ -253,8 +254,8 @@ impl App {
                 // 3. Implement both (a preference to be set in the options menu).
 
                 // Randomly assigns a tag color if two tags with the same color exists.
-                let Self { activity, .. } = self;
-                let Activity { colors, .. } = activity;
+                let Self { config, .. } = self;
+                let Config { colors, .. } = config;
                 if self.tag_assign_behavior == "random" {
                     if let Some(cur_color) = colors.get(index) {
                         if does_color_exist(&colors, cur_color) {
