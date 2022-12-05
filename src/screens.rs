@@ -10,6 +10,8 @@ use egui::{
 };
 
 use egui_dropdown::DropDownBox;
+use rand::random;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Default)]
@@ -189,9 +191,7 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
         ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
             ui.label("\n\n\n");
 
-            let header = RichText::new(app.activity_name.clone())
-                .color(app.color)
-                .size(32.0);
+            let header = RichText::new(app.activity_name.clone()).size(32.0);
             ui.heading(header);
             match &app.warning {
                 None => ui.label("\n\n"),
@@ -259,6 +259,15 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
                         act.entry.push(new_entry);
                         act.total_time.push(app.total_time.unwrap().elapsed());
                     } else {
+                        // If true means a color already exists. There can't be clashing colors for
+                        // tags. Therefore a random one will be assigned.
+                        if app.activity.tag_assign_behavior == "random" {
+                            if app.find_color(&act.colors, &app.color) != usize::MAX {
+                                use crate::app;
+                                app.color = app::random_color(&act.colors, &app.color, None);
+                            }
+                        }
+
                         act.colors.push(app.color.clone());
                         let new_color_index = act.colors.len() - 1;
                         act.total_time.push(app.total_time.unwrap().elapsed());

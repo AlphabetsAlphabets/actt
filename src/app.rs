@@ -339,17 +339,18 @@ fn does_color_exist(colors: &[Color32], color: &Color32) -> bool {
     }
 }
 
-fn random_color(colors: &[Color32], color: &Color32, count: Option<usize>) -> Color32 {
-    let limit = 255 ^ 3;
+pub fn random_color(list_of_colors: &[Color32], color: &Color32, count: Option<usize>) -> Color32 {
+    let limit = 256 ^ 3;
     let count = count.unwrap_or(0) + 1;
     let limit_not_reached = !(limit == count);
+    let color_exists = does_color_exist(list_of_colors, color);
 
-    if limit_not_reached {
+    if color_exists && limit_not_reached {
         let r = rand::thread_rng().gen_range(0..=255);
         let g = rand::thread_rng().gen_range(0..=255);
         let b = rand::thread_rng().gen_range(0..=255);
 
-        random_color(colors, &Color32::from_rgb(r, g, b), Some(count))
+        random_color(list_of_colors, &Color32::from_rgb(r, g, b), Some(count))
     } else {
         color.clone()
     }
