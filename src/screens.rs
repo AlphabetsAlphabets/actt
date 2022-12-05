@@ -134,11 +134,22 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                                 app.tag_name = "".to_string();
                             }
 
+                            let tag_name = app.tag_name.clone();
+
                             ui.add(DropDownBox::from_iter(
                                 &app.activity.tag_list.clone(),
                                 "tags",
                                 &mut app.tag_name,
-                                |ui, text| ui.selectable_label(false, text),
+                                |ui, text| {
+                                    let tag_list = &mut app.activity.tag_list;
+                                    let mut tag_list_iter = tag_list.iter_mut();
+                                    if let Some(color_index) =
+                                        tag_list_iter.position(|e| *e == tag_name)
+                                    {
+                                        app.color = app.activity.colors[color_index];
+                                    }
+                                    ui.selectable_label(false, text)
+                                },
                             ))
                             .on_hover_text("What category is this activity under?");
 
@@ -236,12 +247,15 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
 
                     if app.does_tag_exist(&act.tag_list, &app.tag_name) {
                         let existing_tag_index = app.find_tag(&act.tag_list, &app.tag_name);
-                        let existing_color_index = app.find_color(&act.colors, &app.color);
-                        let new_entry = Entry::new(
-                            app.activity_name.clone(),
-                            existing_tag_index,
-                            existing_color_index,
-                        );
+                        let mut color_index = app.find_color(&act.colors, &app.color);
+
+                        if color_index == usize::MAX {
+                            act.colors.push(app.color.clone());
+                            color_index = act.colors.len() - 1;
+                        }
+
+                        let new_entry =
+                            Entry::new(app.activity_name.clone(), existing_tag_index, color_index);
                         act.entry.push(new_entry);
                         act.total_time.push(app.total_time.unwrap().elapsed());
                     } else {
@@ -332,14 +346,14 @@ fn activity_listing(
 
                     // Tag
                     column[1].vertical_centered_justified(|ui| {
-                        let cur_tag = &tag_list[*tag_index].trim().to_string();
-                        let text = RichText::new(cur_tag.clone()).color(colors[*color_index]);
-                        let label = Label::new(text).sense(Sense::click());
-                        let r = ui.add(label);
+                        let current_tag = &tag_list[*tag_index].trim().to_string();
+                        let text = RichText::new(current_tag.clone()).color(colors[*color_index]);
+                        let button = egui::Button::new(text).frame(false);
+                        let r = ui.add(button);
                         r.context_menu(|ui| {
-                            app.assign_tag(ctx, ui, cur_tag, index);
+                            app.assign_tag(ctx, ui, current_tag, index);
                             if app.tag_name != EMPTY_TAG.to_string() {
-                                app.delete_tag(ui, cur_tag.clone(), index)
+                                app.delete_tag(ui, current_tag.clone(), index)
                             }
                         });
                     });

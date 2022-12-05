@@ -322,8 +322,12 @@ impl App {
         tag_list.iter().position(|e| e == tag_to_find).unwrap()
     }
 
+    /// Returns `usize::MAX` if that color doesn't exist.
     pub fn find_color(&self, colors: &[Color32], color_to_find: &Color32) -> usize {
-        colors.iter().position(|e| e == color_to_find).unwrap()
+        colors
+            .iter()
+            .position(|e| e == color_to_find)
+            .unwrap_or(usize::MAX)
     }
 }
 
