@@ -79,7 +79,7 @@ pub struct App {
     #[serde(skip)]
     pub warning: Option<String>,
 
-    // This is used for visual distinction plus the sunburst.
+    /// This is used for visual distinction plus the sunburst.
     pub color: Color32,
     #[serde(skip)]
     pub focus: bool,

@@ -142,26 +142,26 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                                 app.tag_name = "".to_string();
                             }
 
-                            let tag_name = app.tag_name.clone();
-
                             ui.add(DropDownBox::from_iter(
                                 &app.config.tag_list.clone(),
                                 "tags",
                                 &mut app.tag_name,
                                 |ui, text| {
-                                    let tag_list = &mut app.config.tag_list;
-                                    let mut tag_list_iter = tag_list.iter_mut();
-                                    if let Some(color_index) =
-                                        tag_list_iter.position(|e| *e == tag_name)
-                                    {
-                                        app.color = app.config.colors[color_index];
-                                    }
-                                    ui.selectable_label(false, text)
+                                    let r = ui.selectable_label(false, text);
+                                    r
                                 },
                             ))
                             .on_hover_text("What category is this activity under?");
                         });
                     });
+
+                    let tag_list = &mut app.config.tag_list;
+                    let mut tag_list_iter = tag_list.iter_mut();
+                    if let Some(color_index) =
+                        tag_list_iter.position(|e| *e == app.tag_name)
+                    {
+                        app.color = app.config.colors[color_index];
+                    }
 
                     ui.columns(2, |column| {
                         column[0].vertical_centered_justified(|ui| ui.label("Tag color"));
