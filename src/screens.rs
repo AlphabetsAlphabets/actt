@@ -369,12 +369,32 @@ fn activity_listing(
                         let r = ui.add(button);
 
                         if app.show_tag_assign_window {
-                            egui::Window::new("Change tag").title_bar(false).show(ctx, |ui| {
-                                // FIXME: Don't use `app.activity_name` here use something else.
-                                ui.text_edit_singleline(&mut app.activity_name);
-                                if ui.button("Done").clicked() {
-                                    app.show_tag_assign_window = false;
+                            egui::Window::new("").title_bar(false).show(ctx, |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label("New name");
+                                    ui.text_edit_singleline(&mut app.new_tag);
+                                });
+
+                                // TODO: Add a color picker.
+                                if app.tag_assign_behavior == "picker" {
+                                    // Create a color picker right here.
+                                } else {
+                                    let list_of_colors = &app.config.colors;
+                                    app.color = app::random_color(list_of_colors, &app.color, None);
                                 }
+
+                                ui.vertical_centered(|ui| {
+                                    if ui.button("Done").clicked() {
+                                        // FXIME: This doesn't work
+                                        let mut config_file = app.read_config_file();
+                                        config_file.entry[index].name = app.new_tag.clone();
+
+                                        app.config = config_file;
+                                        app.write_config_file();
+
+                                        app.show_tag_assign_window = false;
+                                    }
+                                });
                             });
                         } else {
                             r.context_menu(|ui| {
