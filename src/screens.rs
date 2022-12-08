@@ -367,15 +367,23 @@ fn activity_listing(
                         let text = RichText::new(current_tag.clone()).color(colors[*color_index]);
                         let button = Button::new(text).frame(false);
                         let r = ui.add(button);
-                        r.context_menu(|ui| {
-                            let tag_modification_button =
-                                ui.add(Button::new("Change tag").frame(false));
-                            if tag_modification_button.clicked() {
-                                app.assign_tag(ctx, ui, current_tag, index);
-                                ui.close_menu();
-                            }
-                            // app.delete_tag(ui, current_tag.clone(), index);
-                        });
+
+                        if app.show_tag_assign_window {
+                            egui::Window::new("Change tag").title_bar(false).show(ctx, |ui| {
+                                // FIXME: Don't use `app.activity_name` here use something else.
+                                ui.text_edit_singleline(&mut app.activity_name);
+                                if ui.button("Done").clicked() {
+                                    app.show_tag_assign_window = false;
+                                }
+                            });
+                        } else {
+                            r.context_menu(|ui| {
+                                if ui.button("Change tag").clicked() {
+                                    app.show_tag_assign_window = true;
+                                    ui.close_menu();
+                                }
+                            });
+                        }
                     });
 
                     let minutes = total_time / 60;

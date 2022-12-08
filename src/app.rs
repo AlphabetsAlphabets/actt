@@ -51,7 +51,7 @@ pub struct App {
     // This is used when the user wishes to create a new tag and assign it
     // to an activity that does not have a tag.
     #[serde(skip)]
-    pub show_tag_assign_dialog: bool,
+    pub show_tag_assign_window: bool,
     #[serde(skip)]
     pub new_tag: String,
     #[serde(skip)]
@@ -60,9 +60,6 @@ pub struct App {
     pub target_tag_index: usize,
     #[serde(skip)]
     pub show_color_picker: bool,
-
-    #[serde(skip)]
-    pub display_ready_tags: HashMap<String, Vec<usize>>,
 
     // User preferences
     /// Can be either `"random"` (default) or `"choice"`.
@@ -151,13 +148,11 @@ impl Default for App {
             new_name: "".to_string(),
             target_name_index: usize::MAX,
 
-            show_tag_assign_dialog: false,
+            show_tag_assign_window: false,
             target_tag: "".to_string(),
             target_tag_index: 0,
             new_tag: "".to_string(),
             show_color_picker: false,
-
-            display_ready_tags: HashMap::default(),
 
             // user preferences
             tag_assign_behavior: "random".to_string(),
@@ -224,65 +219,13 @@ impl App {
     }
 
     /// Used to create new tags or change name of current tag
-    pub fn assign_tag(&mut self, ctx: &Context, ui: &mut egui::Ui, tag: &String, index: usize) {
-        // TODO: Turn this into a window instead. To do two things.
-        // 1. Assign/Change tag as usual. When changing tags, only the *specific* tag is changed.
-        //    Everything else remains the same. It just makes more sense. Changing multiple tags is
-        //    with the check boxes.
-        // 2. Pick a color for a tag.
-        // Reason being that when you delete a tag, you can't reassign a color.
-        // FIXME: WIll need to rework this whole thing.
-        if self.config.colors[index] == Color32::TRANSPARENT {
-            self.assign_tag_after_deletion(ctx, ui);
-        } else if self.show_tag_assign_dialog && index == self.target_tag_index {
-            let text_edit = ui.text_edit_singleline(&mut self.new_tag);
-            if !self.focus {
-                text_edit.request_focus();
-                self.focus = true;
-            }
-
-            let lost_focus = text_edit.lost_focus();
-            let key_pressed = |key: egui::Key| ui.input().key_pressed(key);
-
-            if lost_focus && key_pressed(egui::Key::Enter) {
-                // TODO: This needs to be reworked to accomodate changes in the config file.
-
-                // This check is to see if there are any clashing colors. When renaming a tag, a
-                // new color must be chosen. I can go three routes.
-                // 1. Ask the user what color is to be chosen.
-                // 2. The color is randomly assigned.
-                // 3. Implement both (a preference to be set in the options menu).
-
-                // Randomly assigns a tag color if two tags with the same color exists.
-                let Self { config, .. } = self;
-                let Config { colors, .. } = config;
-                if self.tag_assign_behavior == "random" {
-                    if let Some(cur_color) = colors.get(index) {
-                        if does_color_exist(&colors, cur_color) {
-                            colors[index] = random_color(&colors, cur_color, None);
-                        }
-                    }
-                }
-
-                self.write_config_file();
-                self.show_tag_assign_dialog = false;
-                self.focus = false;
-
-                ui.close_menu();
-            } else if text_edit.lost_focus() {
-                self.show_tag_assign_dialog = false;
-                self.focus = false;
-
-                ui.close_menu();
-            }
-        } else {
-            let btn = egui::Button::new("Change/Assign tag").frame(false);
-            if ui.add(btn).clicked() {
-                self.target_tag_index = index;
-                self.target_tag = tag.clone();
-                self.show_tag_assign_dialog = true;
-            };
+    pub fn change_tag(&mut self, ctx: &Context, ui: &mut egui::Ui, index: usize) {
+        if ui.button("Change tag").clicked() {
+            self.show_tag_assign_window = true;
+        } else if self.show_tag_assign_window {
+            egui::Window::new("Change tag").show(ctx, |ui| ui.label("Hello :D"));
         }
+
     }
 
     /// color - Check if the color exists.
