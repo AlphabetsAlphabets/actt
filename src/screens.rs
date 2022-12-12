@@ -379,18 +379,13 @@ fn activity_listing(
                                 if app.tag_assign_behavior == "picker" {
                                     // Create a color picker right here.
                                 } else {
+                                    todo!("Check if the tag exists BEFORE doing this");
                                     let list_of_colors = &app.config.colors;
                                     app.color = app::random_color(list_of_colors, &app.color, None);
                                 }
 
                                 ui.vertical_centered(|ui| {
-<<<<<<< HEAD
                                     if ui.button("Done").clicked() {
-=======
-                                    if app.new_tag.trim().is_empty() {
-                                        app.show_tag_assign_window = false;
-                                    } else if ui.button("Done").clicked() {
->>>>>>> 4363dbd (You can now change name of tag.)
                                         let mut config_file = app.read_config_file();
                                         let tag_index = config_file.entry[index].tag_index;
                                         config_file.tag_list[tag_index] = app.new_tag.clone();
