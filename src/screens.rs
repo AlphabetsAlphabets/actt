@@ -385,9 +385,9 @@ fn activity_listing(
 
                                 ui.vertical_centered(|ui| {
                                     if ui.button("Done").clicked() {
-                                        // FXIME: This doesn't work
                                         let mut config_file = app.read_config_file();
-                                        config_file.entry[index].name = app.new_tag.clone();
+                                        let tag_index = config_file.entry[index].tag_index;
+                                        config_file.tag_list[tag_index] = app.new_tag.clone();
 
                                         app.config = config_file;
                                         app.write_config_file();
