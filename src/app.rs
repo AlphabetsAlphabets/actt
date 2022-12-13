@@ -61,15 +61,6 @@ pub struct App {
     #[serde(skip)]
     pub show_color_picker: bool,
 
-    // User preferences
-    /// Can be either `"random"` (default) or `"choice"`.
-    /// `"random"` -  Assign a random color to avoid the clash. Which means only a text edit to change the name of the tag will appear.
-    /// `"choice"` A window pops up containing a text edit asking for the user to input a new tag name, along with a color picker to change the name of the tag.  
-    ///
-    /// This is needed when a tag is renamed and the color of the tag already exists.
-    /// It occurs when there are a group of activities with the same tag, and one of them has their tag changed.
-    pub tag_assign_behavior: String,
-
     // Misc. Ungrouped fields that don't belong to a particular group.
     #[serde(skip)]
     pub screen: Screen,
@@ -111,7 +102,7 @@ impl eframe::App for App {
             Screen::Start => start_screen(self, ctx, _frame),
             Screen::Tracking | Screen::Pause => tracking_screen(self, ctx, _frame),
             Screen::History => history_screen(self, ctx, _frame),
-            Screen::Tags => todo!("Tags screen."),
+            Screen::Tags => tags_screen(self, ctx, _frame),
             Screen::Settings => todo!("Settings screen."),
         }
     }
@@ -155,9 +146,6 @@ impl Default for App {
             target_tag_index: 0,
             new_tag: "".to_string(),
             show_color_picker: false,
-
-            // user preferences
-            tag_assign_behavior: "random".to_string(),
 
             screen: Screen::Start,
             warning: None,
@@ -233,7 +221,7 @@ impl App {
             });
 
             // TODO: Add a color picker.
-            if self.tag_assign_behavior == "picker" {
+            if self.config.tag_assign_behavior() == "picker" {
                 todo!("Add a color picker!");
                 // Create a color picker right here.
             } else {
@@ -329,7 +317,7 @@ impl App {
         } else {
             // If true means a color already exists. There can't be clashing colors for
             // tags. Therefore a random one will be assigned.
-            if self.config.preferences.tag_assign_behavior == "random" {
+            if self.config.tag_assign_behavior() == "random" {
                 if self.find_color(&config.colors, &self.color) != usize::MAX {
                     self.color = self::random_color(&config.colors, &self.color, None);
                 }
@@ -346,7 +334,7 @@ impl App {
             config.tag_list.push(self.tag_name.clone());
         }
 
-        config.preferences.tag_assign_behavior = self.tag_assign_behavior.clone();
+        // config.set_tag_assign_behavior(self.tag_assign_behavior.clone());
 
         self.config = config;
         self.write_config_file();

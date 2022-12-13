@@ -31,12 +31,15 @@ impl Entry {
     }
 }
 
-#[derive(Deserialize, Serialize, Default)]
-pub struct Preferences {
-    /// Can be `"random"` (default), or `"picker"`.
-    /// - `random` - A color is assigned at random when there are matching colors.
-    /// - `picker` - A color wheel is shown to the user, allowing them to pick and choose a color.
-    pub tag_assign_behavior: String,
+#[derive(Deserialize, Serialize, Default, Clone)]
+struct Preferences {
+    /// Can be either `"random"` (default) or `"choice"`.
+    /// `"random"` -  Assign a random color to avoid the clash. Which means only a text edit to change the name of the tag will appear.
+    /// `"choice"` A window pops up containing a text edit asking for the user to input a new tag name, along with a color picker to change the name of the tag.  
+    ///
+    /// This is needed when a tag is renamed and the color of the tag already exists.
+    /// It occurs when there are a group of activities with the same tag, and one of them has their tag changed.
+    tag_assign_behavior: String,
 }
 
 // When a new field is added remember to add the change in the delete logic.
@@ -48,12 +51,17 @@ pub struct Config {
     pub total_time: Vec<Duration>,
     pub tag_list: Vec<String>,
     pub colors: Vec<Color32>,
-    pub preferences: Preferences,
+    preferences: Preferences,
 }
 
 impl Config {
-    pub fn get_tags(&self) -> Vec<String> {
-        self.tag_list.clone()
+    /// `value` can be either `"random"` or `"picker"`
+    pub fn tag_assign_behavior(&self) -> &String {
+        &self.preferences.tag_assign_behavior
+    }
+
+    pub fn set_tag_assign_behavior(&mut self, value: String) {
+        self.preferences.tag_assign_behavior = value;
     }
 }
 
@@ -354,4 +362,20 @@ fn activity_listing(
     });
 
     ctx.request_repaint();
+}
+
+pub fn tags_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    egui::CentralPanel::default().show(ctx, |ui| {
+        horizontal_menu(app, ui);
+
+        ui.columns(2, |column| {
+            column[0].vertical_centered_justified(|ui| ui.label(blue_text("Tags")));
+            column[1].vertical_centered_justified(|ui| ui.label(red_text("Delete")));
+            for tag in &app.config.tag_list {
+                column[0].vertical_centered_justified(|ui| ui.label(blue_text(tag)));
+                let del_btn = Button::new(red_text("X"));
+                column[1].vertical_centered_justified(|ui| ui.add(del_btn));
+            }
+        });
+    });
 }
