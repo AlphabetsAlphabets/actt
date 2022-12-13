@@ -22,7 +22,7 @@ pub struct Entry {
 }
 
 impl Entry {
-    fn new(name: String, tag_index: usize, color_index: usize) -> Self {
+    pub fn new(name: String, tag_index: usize, color_index: usize) -> Self {
         Self {
             name,
             tag_index,
@@ -32,11 +32,11 @@ impl Entry {
 }
 
 #[derive(Deserialize, Serialize, Default)]
-struct Preferences {
+pub struct Preferences {
     /// Can be `"random"` (default), or `"picker"`.
     /// - `random` - A color is assigned at random when there are matching colors.
     /// - `picker` - A color wheel is shown to the user, allowing them to pick and choose a color.
-    tag_assign_behavior: String,
+    pub tag_assign_behavior: String,
 }
 
 // When a new field is added remember to add the change in the delete logic.
@@ -45,10 +45,10 @@ struct Preferences {
 pub struct Config {
     // Activity entry
     pub entry: Vec<Entry>,
-    total_time: Vec<Duration>,
+    pub total_time: Vec<Duration>,
     pub tag_list: Vec<String>,
     pub colors: Vec<Color32>,
-    preferences: Preferences,
+    pub preferences: Preferences,
 }
 
 impl Config {
@@ -63,12 +63,16 @@ pub enum Screen {
     Tracking,
     Pause,
     History,
+    Settings,
+    Tags,
 }
 
 pub fn horizontal_menu(app: &mut App, ui: &mut Ui) {
     ui.horizontal_top(|ui| {
         ui.selectable_value(&mut app.screen, Screen::Start, "Home");
         ui.selectable_value(&mut app.screen, Screen::History, "History");
+        ui.selectable_value(&mut app.screen, Screen::Tags, "Tags");
+        ui.selectable_value(&mut app.screen, Screen::Settings, "Settings");
     });
 
     ui.separator();
@@ -234,66 +238,7 @@ pub fn tracking_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::
 
             ui.columns(2, |columns| {
                 if columns[0].button("Stop").clicked() {
-                    // Logic for adding entries to the config file.
-                    app.screen = Screen::History;
-                    match app.pause_time {
-                        Some(pause_time) => {
-                            // Because `total_time` is an Instant adding it with a Duration makes
-                            // it so that the Instant began by Duration. Explanation by Dr Nefario:
-                            // let's say you have an instant for the time of 6AM, and it's currently 7AM.
-                            // the elapsed time will be 1 hour.
-                            // but if you add a 5 minute duration to the instant, making it 6:05AM, the elapsed time will now be 55 minutes
-                            app.total_time = Some(app.total_time.unwrap() + pause_time.elapsed());
-                        }
-                        _ => (),
-                    }
-
-                    // TODO: Find a way to make checks for if preferences were changed
-                    let mut config = app.read_config_file();
-                    config.total_time.push(app.total_time.unwrap().elapsed());
-
-                    if app.does_tag_exist(&config.tag_list, &app.tag_name) {
-                        let existing_tag_index = app.find_tag(&config.tag_list, &app.tag_name);
-                        let mut color_index = app.find_color(&config.colors, &app.color);
-
-                        if color_index == usize::MAX {
-                            config.colors.push(app.color.clone());
-                            color_index = config.colors.len() - 1;
-                        }
-
-                        let new_entry =
-                            Entry::new(app.activity_name.clone(), existing_tag_index, color_index);
-                        config.entry.push(new_entry);
-                        config.total_time.push(app.total_time.unwrap().elapsed());
-                    } else {
-                        // If true means a color already exists. There can't be clashing colors for
-                        // tags. Therefore a random one will be assigned.
-                        if app.config.preferences.tag_assign_behavior == "random" {
-                            if app.find_color(&config.colors, &app.color) != usize::MAX {
-                                app.color = app::random_color(&config.colors, &app.color, None);
-                            }
-                        }
-
-                        config.colors.push(app.color.clone());
-                        let new_color_index = config.colors.len() - 1;
-                        config.total_time.push(app.total_time.unwrap().elapsed());
-
-                        let new_tag_index = config.tag_list.len();
-                        let entry =
-                            Entry::new(app.activity_name.clone(), new_tag_index, new_color_index);
-                        config.entry.push(entry);
-
-                        config.tag_list.push(app.tag_name.clone());
-                    }
-
-                    config.preferences.tag_assign_behavior = app.tag_assign_behavior.clone();
-
-                    app.config = config;
-                    app.write_config_file();
-
-                    app.pause_time = None;
-                    app.total_pause_time = Duration::default();
-                    app.work_time = Duration::default();
+                    app.add_entry();
                 }
 
                 match app.screen {
@@ -380,7 +325,7 @@ fn activity_listing(
                         }
 
                         if app.show_tag_assign_window && index == app.target_tag_index {
-                            app.assign_tag(ctx, ui, index, &colors);
+                            app.change_assign_tag(ctx, index, &colors);
                         }
                     });
 

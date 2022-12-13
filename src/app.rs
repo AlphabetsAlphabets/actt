@@ -111,6 +111,8 @@ impl eframe::App for App {
             Screen::Start => start_screen(self, ctx, _frame),
             Screen::Tracking | Screen::Pause => tracking_screen(self, ctx, _frame),
             Screen::History => history_screen(self, ctx, _frame),
+            Screen::Tags => todo!("Tags screen."),
+            Screen::Settings => todo!("Settings screen."),
         }
     }
 }
@@ -218,25 +220,13 @@ impl App {
         }
     }
 
-    /// Used to create new tags or change name of current tag
-    pub fn change_tag(&mut self, ctx: &Context, ui: &mut egui::Ui, index: usize) {
-        if ui.button("Change tag").clicked() {
-            self.show_tag_assign_window = true;
-        } else if self.show_tag_assign_window {
-            egui::Window::new("Change tag").show(ctx, |ui| ui.label("Hello :D"));
-        }
-    }
-
-    /// color - Check if the color exists.
-    /// Returns a new color that is unique. If `color` is unique, returns `color`.
-    pub fn assign_tag(
-        &mut self,
-        ctx: &Context,
-        ui: &mut egui::Ui,
-        index: usize,
-        list_of_colors: &[Color32],
-    ) {
+    /// The user can change or assign new tags based on the the cirumstance.
+    pub fn change_assign_tag(&mut self, ctx: &Context, index: usize, list_of_colors: &[Color32]) {
         egui::Window::new("").title_bar(false).show(ctx, |ui| {
+            ui.label(
+                "You can create new tags as well, just type the name of a tag that doesn't exist.",
+            );
+            ui.separator();
             ui.horizontal(|ui| {
                 ui.label("New name");
                 ui.text_edit_singleline(&mut self.new_tag);
@@ -244,11 +234,10 @@ impl App {
 
             // TODO: Add a color picker.
             if self.tag_assign_behavior == "picker" {
+                todo!("Add a color picker!");
                 // Create a color picker right here.
             } else {
-                if self.find_color(&list_of_colors, &self.color) != usize::MAX {
-                    self.color = self::random_color(&list_of_colors, &self.color, None);
-                }
+                self.color = self::random_color(&list_of_colors, &self.color, None);
             }
 
             ui.vertical_centered(|ui| {
@@ -303,6 +292,68 @@ impl App {
         // self.write_config_file();
         ui.close_menu();
         // }
+    }
+
+    /// Adds the details of an activity to `Config`.
+    pub fn add_entry(&mut self) {
+        // Logic for adding entries to the config file.
+        self.screen = Screen::History;
+        match self.pause_time {
+            Some(pause_time) => {
+                // Because `total_time` is an Instant adding it with a Duration makes
+                // it so that the Instant began by Duration. Explanation by Dr Nefario:
+                // let's say you have an instant for the time of 6AM, and it's currently 7AM.
+                // the elapsed time will be 1 hour.
+                // but if you add a 5 minute duration to the instant, making it 6:05AM, the elapsed time will now be 55 minutes
+                self.total_time = Some(self.total_time.unwrap() + pause_time.elapsed());
+            }
+            _ => (),
+        }
+
+        // TODO: Find a way to make checks for if preferences were changed
+        let mut config = self.read_config_file();
+        config.total_time.push(self.total_time.unwrap().elapsed());
+
+        if self.does_tag_exist(&config.tag_list, &self.tag_name) {
+            let existing_tag_index = self.find_tag(&config.tag_list, &self.tag_name);
+            let mut color_index = self.find_color(&config.colors, &self.color);
+
+            if color_index == usize::MAX {
+                config.colors.push(self.color.clone());
+                color_index = config.colors.len() - 1;
+            }
+
+            let new_entry = Entry::new(self.activity_name.clone(), existing_tag_index, color_index);
+            config.entry.push(new_entry);
+            config.total_time.push(self.total_time.unwrap().elapsed());
+        } else {
+            // If true means a color already exists. There can't be clashing colors for
+            // tags. Therefore a random one will be assigned.
+            if self.config.preferences.tag_assign_behavior == "random" {
+                if self.find_color(&config.colors, &self.color) != usize::MAX {
+                    self.color = self::random_color(&config.colors, &self.color, None);
+                }
+            }
+
+            config.colors.push(self.color.clone());
+            let new_color_index = config.colors.len() - 1;
+            config.total_time.push(self.total_time.unwrap().elapsed());
+
+            let new_tag_index = config.tag_list.len();
+            let entry = Entry::new(self.activity_name.clone(), new_tag_index, new_color_index);
+            config.entry.push(entry);
+
+            config.tag_list.push(self.tag_name.clone());
+        }
+
+        config.preferences.tag_assign_behavior = self.tag_assign_behavior.clone();
+
+        self.config = config;
+        self.write_config_file();
+
+        self.pause_time = None;
+        self.total_pause_time = Duration::default();
+        self.work_time = Duration::default();
     }
 
     pub fn does_tag_exist(&self, tag_list: &[String], cur_tag: &String) -> bool {
