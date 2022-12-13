@@ -157,9 +157,7 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
 
                     let tag_list = &mut app.config.tag_list;
                     let mut tag_list_iter = tag_list.iter_mut();
-                    if let Some(color_index) =
-                        tag_list_iter.position(|e| *e == app.tag_name)
-                    {
+                    if let Some(color_index) = tag_list_iter.position(|e| *e == app.tag_name) {
                         app.color = app.config.colors[color_index];
                     }
 
@@ -363,47 +361,26 @@ fn activity_listing(
 
                     // Tag
                     column[1].vertical_centered_justified(|ui| {
-                        let current_tag = &tag_list[*tag_index].trim().to_string();
+                        let current_tag = tag_list
+                            .get_mut(*tag_index)
+                            .expect("Expected a tag.")
+                            .trim();
                         let text = RichText::new(current_tag.clone()).color(colors[*color_index]);
                         let button = Button::new(text).frame(false);
                         let r = ui.add(button);
 
-                        if app.show_tag_assign_window {
-                            egui::Window::new("").title_bar(false).show(ctx, |ui| {
-                                ui.horizontal(|ui| {
-                                    ui.label("New name");
-                                    ui.text_edit_singleline(&mut app.new_tag);
-                                });
-
-                                // TODO: Add a color picker.
-                                if app.tag_assign_behavior == "picker" {
-                                    // Create a color picker right here.
-                                } else {
-                                    todo!("Check if the tag exists BEFORE doing this");
-                                    let list_of_colors = &app.config.colors;
-                                    app.color = app::random_color(list_of_colors, &app.color, None);
-                                }
-
-                                ui.vertical_centered(|ui| {
-                                    if ui.button("Done").clicked() {
-                                        let mut config_file = app.read_config_file();
-                                        let tag_index = config_file.entry[index].tag_index;
-                                        config_file.tag_list[tag_index] = app.new_tag.clone();
-
-                                        app.config = config_file;
-                                        app.write_config_file();
-
-                                        app.show_tag_assign_window = false;
-                                    }
-                                });
-                            });
-                        } else {
+                        if !app.show_tag_assign_window {
                             r.context_menu(|ui| {
                                 if ui.button("Change tag").clicked() {
                                     app.show_tag_assign_window = true;
+                                    app.target_tag_index = index;
                                     ui.close_menu();
                                 }
                             });
+                        }
+
+                        if app.show_tag_assign_window && index == app.target_tag_index {
+                            app.assign_tag(ctx, ui, index, &colors);
                         }
                     });
 
@@ -415,8 +392,10 @@ fn activity_listing(
                     let total_time = format!("{}h {}m {}s", hours, minutes, seconds);
 
                     // Total time
-                    column[2].vertical_centered_justified(|ui| ui.label(total_time));
+                    let time_btn = Button::new(total_time).frame(false);
+                    column[2].vertical_centered_justified(|ui| ui.add(time_btn));
 
+                    // Delete
                     column[3].vertical_centered_justified(|ui| {
                         if ui.button("X").clicked() {
                             app.config.entry.remove(index);
@@ -425,8 +404,6 @@ fn activity_listing(
                         }
                     });
                 }
-
-                // Delete
             });
         });
     });

@@ -225,13 +225,64 @@ impl App {
         } else if self.show_tag_assign_window {
             egui::Window::new("Change tag").show(ctx, |ui| ui.label("Hello :D"));
         }
-
     }
 
     /// color - Check if the color exists.
     /// Returns a new color that is unique. If `color` is unique, returns `color`.
-    pub fn assign_tag_after_deletion(&mut self, ctx: &Context, ui: &mut egui::Ui) {
-        egui::Window::new("Title").show(ctx, |ui| ui.label("Hello"));
+    pub fn assign_tag(
+        &mut self,
+        ctx: &Context,
+        ui: &mut egui::Ui,
+        index: usize,
+        list_of_colors: &[Color32],
+    ) {
+        egui::Window::new("").title_bar(false).show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("New name");
+                ui.text_edit_singleline(&mut self.new_tag);
+            });
+
+            // TODO: Add a color picker.
+            if self.tag_assign_behavior == "picker" {
+                // Create a color picker right here.
+            } else {
+                if self.find_color(&list_of_colors, &self.color) != usize::MAX {
+                    self.color = self::random_color(&list_of_colors, &self.color, None);
+                }
+            }
+
+            ui.vertical_centered(|ui| {
+                let done_btn = ui.button("Done");
+                if !done_btn.clicked() {
+                    return;
+                }
+
+                if self.new_tag.is_empty() {
+                    return;
+                }
+
+                let mut config_file = self.read_config_file();
+                if config_file.tag_list.contains(&self.new_tag) {
+                    todo!("Warn user that tag exists, choose another one.");
+                }
+
+                config_file.tag_list.push(self.new_tag.clone());
+                self.color = self::random_color(&list_of_colors, &self.color, None);
+                config_file.colors.push(self.color.clone());
+
+                if let Some(entry) = config_file.entry.get_mut(index) {
+                    entry.tag_index = config_file.tag_list.len() - 1;
+                    entry.color_index = config_file.colors.len() - 1;
+                }
+
+                self.config = config_file;
+                self.write_config_file();
+
+                if self.config_file_updated {
+                    self.show_tag_assign_window = false;
+                }
+            });
+        });
     }
 
     /// target_tag: The tag that is to be deleted.
