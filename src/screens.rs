@@ -104,7 +104,7 @@ pub fn history_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::F
 
             let mut config = app.read_config_file();
 
-            if config.entry.len() == 0 {
+            if config.entry.len() == 0 || config.tag_list.is_empty() {
                 ui.label("It's empty!");
             } else {
                 activity_listing(app, &mut config, ctx, _frame, ui);
@@ -314,17 +314,33 @@ fn activity_listing(
 
                     // Tag
                     column[1].vertical_centered_justified(|ui| {
-                        let current_tag = tag_list
-                            .get_mut(*tag_index)
-                            .expect("Expected a tag.")
-                            .trim();
-                        let text = RichText::new(current_tag.clone()).color(colors[*color_index]);
+                        // This is false when the tag is delete, since the tag doesn't exist it
+                        // gets an empty string instead.
+                        let current_tag = if let Some(current_tag) = tag_list.get_mut(*tag_index) {
+                            current_tag.trim()
+                        } else {
+                            ""
+                        };
+
+                        let tag_is_empty = current_tag.is_empty();
+                        let text = if tag_is_empty {
+                            RichText::new(current_tag.clone()).color(Color32::TRANSPARENT)
+                        } else {
+                            RichText::new(current_tag.clone()).color(colors[*color_index])
+                        };
+
                         let button = Button::new(text).frame(false);
                         let r = ui.add(button);
 
                         if !app.show_tag_assign_window {
                             r.context_menu(|ui| {
-                                if ui.button("Change tag").clicked() {
+                                let btn_text = if tag_is_empty {
+                                    "Create tag"
+                                } else {
+                                    "Change tag"
+                                };
+
+                                if ui.button(btn_text).clicked() {
                                     app.show_tag_assign_window = true;
                                     app.target_tag_index = index;
                                     ui.close_menu();
@@ -333,7 +349,7 @@ fn activity_listing(
                         }
 
                         if app.show_tag_assign_window && index == app.target_tag_index {
-                            app.change_assign_tag(ctx, index, &colors);
+                            app.change_or_assign_tag(ctx, index, &colors);
                         }
                     });
 
@@ -371,10 +387,18 @@ pub fn tags_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fram
         ui.columns(2, |column| {
             column[0].vertical_centered_justified(|ui| ui.label(blue_text("Tags")));
             column[1].vertical_centered_justified(|ui| ui.label(red_text("Delete")));
-            for tag in &app.config.tag_list {
+
+            let mut config = app.read_config_file();
+            for tag in config.tag_list.iter_mut() {
                 column[0].vertical_centered_justified(|ui| ui.label(blue_text(tag)));
                 let del_btn = Button::new(red_text("X"));
-                column[1].vertical_centered_justified(|ui| ui.add(del_btn));
+                column[1].vertical_centered_justified(|ui| {
+                    let r = ui.add(del_btn);
+                    if r.clicked() {
+                        app.delete_tag(tag.clone());
+                    }
+                    r
+                });
             }
         });
     });

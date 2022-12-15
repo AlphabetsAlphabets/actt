@@ -209,7 +209,12 @@ impl App {
     }
 
     /// The user can change or assign new tags based on the the cirumstance.
-    pub fn change_assign_tag(&mut self, ctx: &Context, index: usize, list_of_colors: &[Color32]) {
+    pub fn change_or_assign_tag(
+        &mut self,
+        ctx: &Context,
+        index: usize,
+        list_of_colors: &[Color32],
+    ) {
         egui::Window::new("").title_bar(false).show(ctx, |ui| {
             ui.label(
                 "You can create new tags as well, just type the name of a tag that doesn't exist.",
@@ -262,24 +267,19 @@ impl App {
         });
     }
 
-    /// target_tag: The tag that is to be deleted.
-    pub fn delete_tag(&mut self, ui: &mut egui::Ui, target_tag: String, index: usize) {
-        let btn = egui::Button::new("Delete tag").frame(false);
-        // FIXME: delete_tag
-        // if ui.add(btn).clicked() {
-        //     for tag in self.activity.tag.iter_mut() {
-        //         if *tag == target_tag {
-        //             // Sets the tag to an empty tag. Which signifies "deleted".
-        //             *tag = EMPTY_TAG.to_string();
-        //             if let Some(color) = self.activity.color.get_mut(index) {
-        //                 *color = DEFAULT_TAG_COLOR;
-        //             }
-        //         }
-        //     }
+    pub fn delete_tag(&mut self, tag_to_delete: String) {
+        let del_index = self
+            .config
+            .tag_list
+            .iter()
+            .position(|tag| *tag == tag_to_delete)
+            .expect("Tag not found, which *should* be impossible.");
 
-        // self.write_config_file();
-        ui.close_menu();
-        // }
+        // Each tag has a color associated with it, if tag is delete the
+        // colors must be deleted along with it as well.
+        self.config.tag_list.remove(del_index);
+        self.config.colors.remove(del_index);
+        self.write_config_file();
     }
 
     /// Adds the details of an activity to `Config`.
