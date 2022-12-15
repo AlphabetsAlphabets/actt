@@ -245,6 +245,10 @@ impl App {
 
                 let mut config_file = self.read_config_file();
                 if config_file.tag_list.contains(&self.new_tag) {
+                    // FIXME:
+                    // This is wrong. A user can rename a tag to be the same one, because they
+                    // could have clicked on the wrong tag. Instead find the same color and return
+                    // early.
                     todo!("Warn user that tag exists, choose another one.");
                 }
 

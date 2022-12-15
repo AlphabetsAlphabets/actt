@@ -168,9 +168,16 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                     });
 
                     let tag_list = &mut app.config.tag_list;
+                    let list_of_colors = &app.config.colors;
+
                     let mut tag_list_iter = tag_list.iter_mut();
                     if let Some(color_index) = tag_list_iter.position(|e| *e == app.tag_name) {
-                        app.color = app.config.colors[color_index];
+                        let color = app.config.colors[color_index];
+                        let color_exist = !(app.find_color(list_of_colors, &color) == usize::MAX);
+
+                        if color_exist {
+                            color = app::random_color(list_of_colors, &color, None);
+                        }
                     }
 
                     ui.columns(2, |column| {
