@@ -1,16 +1,14 @@
 use crate::constants::*;
 use crate::screens::{Config, Screen, *};
-use rand::{random, Rng};
 
 use std::{
-    collections::HashMap,
     fs,
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
 
 use dirs::config_dir;
-use egui::{Button, Color32, Context};
+use egui::{Color32, Context};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -67,7 +65,7 @@ pub struct App {
     #[serde(skip)]
     pub warning: Option<String>,
 
-    /// This is used for visual distinction plus the sunburst.
+    /// Sunburst and visual distinction
     pub color: Color32,
     #[serde(skip)]
     pub focus: bool,
@@ -230,7 +228,7 @@ impl App {
                 todo!("Add a color picker!");
                 // Create a color picker right here.
             } else {
-                self.color = self::random_color(&list_of_colors, &self.color, None);
+                self.color = self.config.random_color(&list_of_colors, &self.color, None);
             }
 
             ui.vertical_centered(|ui| {
@@ -253,7 +251,7 @@ impl App {
                 }
 
                 config_file.tag_list.push(self.new_tag.clone());
-                self.color = self::random_color(&list_of_colors, &self.color, None);
+                self.color = self.config.random_color(&list_of_colors, &self.color, None);
                 config_file.colors.push(self.color.clone());
 
                 if let Some(entry) = config_file.entry.get_mut(index) {
@@ -307,8 +305,8 @@ impl App {
         config.total_time.push(self.total_time.unwrap().elapsed());
 
         if self.does_tag_exist(&config.tag_list, &self.tag_name) {
-            let existing_tag_index = self.find_tag(&config.tag_list, &self.tag_name);
-            let mut color_index = self.find_color(&config.colors, &self.color);
+            let existing_tag_index = self.config.find_tag(&config.tag_list, &self.tag_name);
+            let mut color_index = self.config.find_color(&config.colors, &self.color);
 
             if color_index == usize::MAX {
                 config.colors.push(self.color.clone());
@@ -322,8 +320,8 @@ impl App {
             // If true means a color already exists. There can't be clashing colors for
             // tags. Therefore a random one will be assigned.
             if self.config.tag_assign_behavior() == "random" {
-                if self.find_color(&config.colors, &self.color) != usize::MAX {
-                    self.color = self::random_color(&config.colors, &self.color, None);
+                if self.config.find_color(&config.colors, &self.color) != usize::MAX {
+                    self.color = self.config.random_color(&config.colors, &self.color, None);
                 }
             }
 
@@ -354,42 +352,5 @@ impl App {
         } else {
             false
         }
-    }
-
-    pub fn find_tag(&self, tag_list: &[String], tag_to_find: &String) -> usize {
-        tag_list.iter().position(|e| e == tag_to_find).unwrap()
-    }
-
-    /// Returns `usize::MAX` if that color doesn't exist.
-    pub fn find_color(&self, colors: &[Color32], color_to_find: &Color32) -> usize {
-        colors
-            .iter()
-            .position(|e| e == color_to_find)
-            .unwrap_or(usize::MAX)
-    }
-}
-
-fn does_color_exist(colors: &[Color32], color: &Color32) -> bool {
-    if colors.contains(&color) {
-        true
-    } else {
-        false
-    }
-}
-
-pub fn random_color(list_of_colors: &[Color32], color: &Color32, count: Option<usize>) -> Color32 {
-    let limit = 256 ^ 3;
-    let count = count.unwrap_or(0) + 1;
-    let limit_not_reached = !(limit == count);
-    let color_exists = does_color_exist(list_of_colors, color);
-
-    if color_exists && limit_not_reached {
-        let r = rand::thread_rng().gen_range(0..=255);
-        let g = rand::thread_rng().gen_range(0..=255);
-        let b = rand::thread_rng().gen_range(0..=255);
-
-        random_color(list_of_colors, &Color32::from_rgb(r, g, b), Some(count))
-    } else {
-        color.clone()
     }
 }

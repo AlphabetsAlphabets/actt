@@ -12,6 +12,7 @@ use egui::{
 };
 
 use egui_dropdown::DropDownBox;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Default)]
@@ -62,6 +63,52 @@ impl Config {
 
     pub fn set_tag_assign_behavior(&mut self, value: String) {
         self.preferences.tag_assign_behavior = value;
+    }
+
+    /// Returns `usize::MAX` if tag doesn't exist. Otherwise, returns the tag index.
+    pub fn find_tag(&self, tag_list: &[String], tag_to_find: &String) -> usize {
+        tag_list
+            .iter()
+            .position(|e| e == tag_to_find)
+            .unwrap_or(usize::MAX)
+    }
+
+    /// Returns `usize::MAX` if that color doesn't exist. Otherwise, returns the index of the color
+    pub fn find_color(&self, colors: &[Color32], color_to_find: &Color32) -> usize {
+        colors
+            .iter()
+            .position(|e| e == color_to_find)
+            .unwrap_or(usize::MAX)
+    }
+
+    fn does_color_exist(&self, colors: &[Color32], color: &Color32) -> bool {
+        if colors.contains(&color) {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn random_color(
+        &self,
+        list_of_colors: &[Color32],
+        color: &Color32,
+        count: Option<usize>,
+    ) -> Color32 {
+        let limit = 256 ^ 3;
+        let count = count.unwrap_or(0) + 1;
+        let limit_not_reached = !(limit == count);
+        let color_exists = self.does_color_exist(list_of_colors, color);
+
+        if color_exists && limit_not_reached {
+            let r = rand::thread_rng().gen_range(0..=255);
+            let g = rand::thread_rng().gen_range(0..=255);
+            let b = rand::thread_rng().gen_range(0..=255);
+
+            self.random_color(list_of_colors, &Color32::from_rgb(r, g, b), Some(count))
+        } else {
+            color.clone()
+        }
     }
 }
 
@@ -119,6 +166,7 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
     // Which means that the return type needs to cover that as well.
     egui::CentralPanel::default().show(ctx, |ui| {
         app.config = app.read_config_file();
+        let list_of_colors = app.config.colors.clone();
 
         horizontal_menu(app, ui);
         ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
@@ -167,23 +215,25 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                         });
                     });
 
-                    let tag_list = &mut app.config.tag_list;
-                    let list_of_colors = &app.config.colors;
-
-                    let mut tag_list_iter = tag_list.iter_mut();
-                    if let Some(color_index) = tag_list_iter.position(|e| *e == app.tag_name) {
-                        let color = app.config.colors[color_index];
-                        let color_exist = !(app.find_color(list_of_colors, &color) == usize::MAX);
-
-                        if color_exist {
-                            color = app::random_color(list_of_colors, &color, None);
-                        }
-                    }
-
                     ui.columns(2, |column| {
                         column[0].vertical_centered_justified(|ui| ui.label("Tag color"));
                         column[1].vertical_centered_justified(|ui| {
                             color_picker_color32(ui, &mut app.color, Alpha::Opaque);
+                            let tag_index =
+                                app.config.find_tag(&app.config.tag_list, &app.tag_name);
+                            let tag_exist = tag_index == usize::MAX;
+
+                            if !tag_exist {
+                                app.color = app.config.colors[tag_index];
+                            }
+
+                            let does_color_exist =
+                                app.config.does_color_exist(&list_of_colors, &app.color);
+
+                            if tag_exist && does_color_exist {
+                                app.color =
+                                    app.config.random_color(&list_of_colors, &app.color, None);
+                            }
                         });
                     });
                 },
