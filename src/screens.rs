@@ -219,21 +219,6 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                         column[0].vertical_centered_justified(|ui| ui.label("Tag color"));
                         column[1].vertical_centered_justified(|ui| {
                             color_picker_color32(ui, &mut app.color, Alpha::Opaque);
-                            let tag_index =
-                                app.config.find_tag(&app.config.tag_list, &app.tag_name);
-                            let tag_exist = tag_index == usize::MAX;
-
-                            if !tag_exist {
-                                app.color = app.config.colors[tag_index];
-                            }
-
-                            let does_color_exist =
-                                app.config.does_color_exist(&list_of_colors, &app.color);
-
-                            if tag_exist && does_color_exist {
-                                app.color =
-                                    app.config.random_color(&list_of_colors, &app.color, None);
-                            }
                         });
                     });
                 },
@@ -249,6 +234,19 @@ pub fn start_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fra
                             .to_string(),
                     );
                 } else {
+                    let tag_index = app.config.find_tag(&app.config.tag_list, &app.tag_name);
+                    let tag_exist = tag_index == usize::MAX;
+
+                    if !tag_exist {
+                        app.color = app.config.colors[tag_index];
+                    }
+
+                    let does_color_exist = app.config.does_color_exist(&list_of_colors, &app.color);
+
+                    if tag_exist && does_color_exist {
+                        app.color = app.config.random_color(&list_of_colors, &app.color, None);
+                    }
+
                     if app.tag_name.is_empty() {
                         app.tag_name = EMPTY_TAG.to_string();
                     }
