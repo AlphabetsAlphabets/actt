@@ -83,7 +83,7 @@ impl App {
             return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
         }
 
-        Default::default()
+        Self::default()
     }
 }
 
@@ -101,7 +101,7 @@ impl eframe::App for App {
             Screen::Tracking | Screen::Pause => tracking_screen(self, ctx, _frame),
             Screen::History => history_screen(self, ctx, _frame),
             Screen::Tags => tags_screen(self, ctx, _frame),
-            Screen::Settings => todo!("Settings screen."),
+            Screen::Settings => settings_screen(self, ctx, _frame),
         }
     }
 }

@@ -5,11 +5,12 @@ use crate::App;
 
 use std::time::{Duration, Instant};
 
-use egui::Button;
 use egui::{
     color_picker::{color_picker_color32, Alpha},
-    Color32, RichText, ScrollArea, Ui, Vec2,
+    Button, Color32, RichText, ScrollArea, Ui, Vec2,
 };
+
+use derivative::Derivative;
 
 use egui_dropdown::DropDownBox;
 use rand::Rng;
@@ -32,26 +33,35 @@ impl Entry {
     }
 }
 
-#[derive(Deserialize, Serialize, Default, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 struct Preferences {
     /// Can be either `"random"` (default) or `"choice"`.
     /// `"random"` -  Assign a random color to avoid the clash. Which means only a text edit to change the name of the tag will appear.
-    /// `"choice"` A window pops up containing a text edit asking for the user to input a new tag name, along with a color picker to change the name of the tag.  
-    ///
+    /// `"choice"` A window pops up containing a text edit asking for the user to input a new tag name, along with a color picker to change the name of the tag.
     /// This is needed when a tag is renamed and the color of the tag already exists.
     /// It occurs when there are a group of activities with the same tag, and one of them has their tag changed.
     tag_assign_behavior: String,
 }
 
+impl Default for Preferences {
+    fn default() -> Self {
+        Self {
+            tag_assign_behavior: "random".to_string(),
+        }
+    }
+}
+
 // When a new field is added remember to add the change in the delete logic.
 // This also applies to the stop logic for adding entries to the config file.
-#[derive(Deserialize, Serialize, Default)]
+#[derive(Derivative, Deserialize, Serialize, Default)]
 pub struct Config {
     // Activity entry
     pub entry: Vec<Entry>,
     pub total_time: Vec<Duration>,
     pub tag_list: Vec<String>,
     pub colors: Vec<Color32>,
+
+    #[derivative(Default(value = "Preferences::default()"))]
     preferences: Preferences,
 }
 
@@ -59,10 +69,6 @@ impl Config {
     /// `value` can be either `"random"` or `"picker"`
     pub fn tag_assign_behavior(&self) -> &String {
         &self.preferences.tag_assign_behavior
-    }
-
-    pub fn set_tag_assign_behavior(&mut self, value: String) {
-        self.preferences.tag_assign_behavior = value;
     }
 
     /// Returns `usize::MAX` if tag doesn't exist. Otherwise, returns the tag index.
@@ -456,5 +462,16 @@ pub fn tags_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fram
                 });
             }
         });
+    });
+}
+
+pub fn settings_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    egui::CentralPanel::default().show(ctx, |ui| {
+        horizontal_menu(app, ui);
+        let Config {
+            preferences: pref, ..
+        } = &mut app.config;
+
+        ui.heading("Settings");
     });
 }
