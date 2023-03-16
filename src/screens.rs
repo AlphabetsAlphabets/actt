@@ -1,122 +1,19 @@
-use crate::app;
+use crate::app::App;
 use crate::colors::*;
-use crate::constants::*;
-use crate::App;
 
-use std::time::{Duration, Instant};
+use super::config::Config;
+use super::config::Entry;
+
+use super::constants::*;
+
+use std::time::Instant;
 
 use egui::{
     color_picker::{color_picker_color32, Alpha},
     Button, Color32, RichText, ScrollArea, Ui, Vec2,
 };
 
-use derivative::Derivative;
-
 use egui_dropdown::DropDownBox;
-use rand::Rng;
-use serde::{Deserialize, Serialize};
-
-#[derive(Deserialize, Serialize, Default)]
-pub struct Entry {
-    pub name: String,
-    pub tag_index: usize,
-    pub color_index: usize,
-}
-
-impl Entry {
-    pub fn new(name: String, tag_index: usize, color_index: usize) -> Self {
-        Self {
-            name,
-            tag_index,
-            color_index,
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Clone)]
-struct Preferences {
-    /// Can be either `"random"` (default) or `"choice"`.
-    /// `"random"` -  Assign a random color to avoid the clash. Which means only a text edit to change the name of the tag will appear.
-    /// `"choice"` A window pops up containing a text edit asking for the user to input a new tag name, along with a color picker to change the name of the tag.
-    /// This is needed when a tag is renamed and the color of the tag already exists.
-    /// It occurs when there are a group of activities with the same tag, and one of them has their tag changed.
-    tag_assign_behavior: String,
-}
-
-impl Default for Preferences {
-    fn default() -> Self {
-        Self {
-            tag_assign_behavior: "random".to_string(),
-        }
-    }
-}
-
-// When a new field is added remember to add the change in the delete logic.
-// This also applies to the stop logic for adding entries to the config file.
-#[derive(Derivative, Deserialize, Serialize, Default)]
-pub struct Config {
-    // Activity entry
-    pub entry: Vec<Entry>,
-    pub total_time: Vec<Duration>,
-    pub tag_list: Vec<String>,
-    pub colors: Vec<Color32>,
-
-    #[derivative(Default(value = "Preferences::default()"))]
-    preferences: Preferences,
-}
-
-impl Config {
-    /// `value` can be either `"random"` or `"picker"`
-    pub fn tag_assign_behavior(&self) -> &String {
-        &self.preferences.tag_assign_behavior
-    }
-
-    /// Returns `usize::MAX` if tag doesn't exist. Otherwise, returns the tag index.
-    pub fn find_tag(&self, tag_list: &[String], tag_to_find: &String) -> usize {
-        tag_list
-            .iter()
-            .position(|e| e == tag_to_find)
-            .unwrap_or(usize::MAX)
-    }
-
-    /// Returns `usize::MAX` if that color doesn't exist. Otherwise, returns the index of the color
-    pub fn find_color(&self, colors: &[Color32], color_to_find: &Color32) -> usize {
-        colors
-            .iter()
-            .position(|e| e == color_to_find)
-            .unwrap_or(usize::MAX)
-    }
-
-    fn does_color_exist(&self, colors: &[Color32], color: &Color32) -> bool {
-        if colors.contains(&color) {
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn random_color(
-        &self,
-        list_of_colors: &[Color32],
-        color: &Color32,
-        count: Option<usize>,
-    ) -> Color32 {
-        let limit = 256 ^ 3;
-        let count = count.unwrap_or(0) + 1;
-        let limit_not_reached = !(limit == count);
-        let color_exists = self.does_color_exist(list_of_colors, color);
-
-        if color_exists && limit_not_reached {
-            let r = rand::thread_rng().gen_range(0..=255);
-            let g = rand::thread_rng().gen_range(0..=255);
-            let b = rand::thread_rng().gen_range(0..=255);
-
-            self.random_color(list_of_colors, &Color32::from_rgb(r, g, b), Some(count))
-        } else {
-            color.clone()
-        }
-    }
-}
 
 #[derive(PartialEq)]
 pub enum Screen {
@@ -456,7 +353,7 @@ pub fn tags_screen(app: &mut App, ctx: &egui::Context, _frame: &mut eframe::Fram
                 column[1].vertical_centered_justified(|ui| {
                     let r = ui.add(del_btn);
                     if r.clicked() {
-                        app.delete_tag(tag.clone());
+                        app.delete_tag(tag.to_string());
                     }
                     r
                 });
