@@ -31,20 +31,26 @@ impl Config {
         &self.preferences.tag_assign_behavior
     }
 
-    /// Returns `usize::MAX` if tag doesn't exist. Otherwise, returns the tag index.
-    pub fn find_tag(&self, tag_list: &[String], tag_to_find: &String) -> usize {
+    /// Finds the specified tag in the config file.
+    ///
+    /// # Return
+    /// Returns `Some(n)` where `n` is the index of the tag if found and
+    /// `None` if the tag doesn't exist.
+    pub fn find_tag(&self, tag_list: &[String], tag_to_find: &String) -> Option<usize> {
         tag_list
             .iter()
             .position(|e| e == tag_to_find)
-            .unwrap_or(usize::MAX)
     }
 
-    /// Returns `usize::MAX` if that color doesn't exist. Otherwise, returns the index of the color
-    pub fn find_color(&self, colors: &[Color32], color_to_find: &Color32) -> usize {
+    /// Finds the specified tag in the config file.
+    ///
+    /// # Return
+    /// Returns `Some(n)` where `n` is the index of the color if found and
+    /// `None` if the color doesn't exist.
+    pub fn find_color(&self, colors: &[Color32], color_to_find: &Color32) -> Option<usize> {
         colors
             .iter()
             .position(|e| e == color_to_find)
-            .unwrap_or(usize::MAX)
     }
 
     pub fn does_color_exist(&self, colors: &[Color32], color: &Color32) -> bool {

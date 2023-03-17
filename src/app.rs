@@ -8,12 +8,18 @@ use std::{
 };
 
 use dirs::config_dir;
-use egui::{Color32, Context};
+use egui::{Color32, Context, Response, Ui};
+use egui_dropdown::DropDownBox;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct App {
+    /// Even if it is unsued, ignore this warning. This is useful for passing in data.
+    /// This way I won't need to keep redeclaring it.
+    #[serde(skip)]
+    pub tmp: String,
+
     /// Name of the current activity.
     pub activity_name: String,
     /// The tag of the current activity.
@@ -159,6 +165,7 @@ impl Default for App {
         }
 
         Self {
+            tmp: "".to_string(),
             activity_name: "".to_string(),
             tag_name: "".to_string(),
 
@@ -196,6 +203,29 @@ impl Default for App {
 }
 
 impl App {
+    /// Creates a copy of the tag list
+    pub fn tag_list(&self) -> Vec<String> {
+        self.config.tag_list.clone()
+    }
+    
+    /// Gets a mutable reference of the tag list
+    pub fn tag_list_mut(&mut self) -> &mut Vec<String> {
+        &mut self.config.tag_list
+    }
+
+    /// Creates a combo box of tag list
+    pub fn tag_list_combo_box(&mut self, ui: &mut Ui) -> Response {
+        ui.add(DropDownBox::from_iter(
+            &self.tag_list(),
+            "tags",
+            &mut self.tag_name,
+            |ui, text| {
+                let r = ui.selectable_label(false, text);
+                r
+            },
+        ))
+    }
+
     pub fn write_config_file(&mut self) {
         let json = serde_json::to_string(&self.config).unwrap();
         fs::write(&self.config_file, json).unwrap();
@@ -277,8 +307,7 @@ impl App {
     }
 
     /// Changes the existing tag to a current one.
-    pub fn change_tag(&mut self, ctx: &Context, index: usize, list_of_colors: &[Color32]) {
-    }
+    pub fn change_tag(&mut self, ctx: &Context, index: usize, list_of_colors: &[Color32]) {}
 
     /// The user can change or assign new tags based on the the cirumstance.
     pub fn change_or_assign_tag(
@@ -378,22 +407,31 @@ impl App {
         config.total_time.push(self.total_time.unwrap().elapsed());
 
         if self.does_tag_exist(&config.tag_list, &self.tag_name) {
-            let existing_tag_index = self.config.find_tag(&config.tag_list, &self.tag_name);
+            let existing_tag_index = self.config.find_tag(&self.tag_list(), &self.tag_name);
             let mut color_index = self.config.find_color(&config.colors, &self.color);
 
-            if color_index == usize::MAX {
+            if color_index.is_none() {
+                // Creates a new color
                 config.colors.push(self.color.clone());
-                color_index = config.colors.len() - 1;
+                color_index = Some(config.colors.len() - 1);
             }
 
-            let new_entry = Entry::new(self.activity_name.clone(), existing_tag_index, color_index);
+            let new_entry = Entry::new(
+                self.activity_name.clone(),
+                existing_tag_index.unwrap(),
+                color_index.unwrap(),
+            );
             config.entry.push(new_entry);
             config.total_time.push(self.total_time.unwrap().elapsed());
         } else {
             // If true means a color already exists. There can't be clashing colors for
             // tags. Therefore a random one will be assigned.
             if self.config.tag_assign_behavior() == "random" {
-                if self.config.find_color(&config.colors, &self.color) != usize::MAX {
+                if self
+                    .config
+                    .find_color(&config.colors, &self.color)
+                    .is_some()
+                {
                     self.color = self.config.random_color(&config.colors, &self.color, None);
                 }
             }
