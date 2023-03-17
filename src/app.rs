@@ -1,5 +1,5 @@
-use super::constants::*;
 use crate::screens::*;
+use crate::user::{Config, Entry};
 
 use std::{
     fs,

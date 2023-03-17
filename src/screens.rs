@@ -1,10 +1,7 @@
 use crate::app::App;
-use crate::colors::*;
+use crate::user::{Entry, Config};
 
-use super::config::Config;
-use super::config::Entry;
-
-use super::constants::*;
+use crate::constants::*;
 
 use std::time::Instant;
 

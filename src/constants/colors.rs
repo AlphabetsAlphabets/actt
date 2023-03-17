@@ -1,4 +1,4 @@
-use egui::{Color32, RichText};
+pub use egui::{Color32, RichText};
 
 pub fn blue_text(text: &str) -> RichText {
     RichText::new(text).color(Color32::LIGHT_BLUE)

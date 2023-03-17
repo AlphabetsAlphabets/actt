@@ -2,7 +2,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![feature(drain_filter)]
 
-use actt::App;
+pub mod app;
+use app::App;
+
+pub mod user;
+pub mod screens;
+pub mod constants;
+
 use eframe;
 
 // When compiling natively:
