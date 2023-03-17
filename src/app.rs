@@ -14,59 +14,81 @@ use egui::{Color32, Context};
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct App {
+    /// Name of the current activity.
     pub activity_name: String,
+    /// The tag of the current activity.
     pub tag_name: String,
 
+    /// Path to the config file.
     #[serde(skip)]
     pub config_file: PathBuf,
     // This is only used for updating the tags the user has made.
     #[serde(skip)]
     pub config_file_updated: bool,
+    /// Keeps track of the user's configs.
     #[serde(skip)]
     pub config: Config,
 
-    // This isn't used but I plan to use it to show how much time you spent relaxing.
-    // I'm unsure of the exact implementation details though. Cuz I'll have to go through the
-    // code for time again.
+    /// UNUSED. TODO.
+    /// A tally of how long the user paused an activity throughout the
+    /// entire run of the activity.
     #[serde(skip)]
     pub total_pause_time: Duration,
+    /// The amount of time the user is pause for each time, instead of throughout
+    /// the entire run of the activity.
     #[serde(skip)]
     pub pause_time: Option<Instant>,
+    /// The amount of time passed when conducting the activity. 
+    /// `total_time = pause_time + work_time`
     #[serde(skip)]
     pub total_time: Option<Instant>,
+    /// The amount of time the user is working on something.
     #[serde(skip)]
     pub work_time: Duration,
 
     // This group is for changing the name of an activity.
+    /// The dialog box to be shown when the user when they want
+    /// to change the name of an activity in the history screen.
     #[serde(skip)]
     pub show_name_assign_dialog: bool,
+    // The new name of the activity.
     #[serde(skip)]
     pub new_name: String,
+    /// The index of `new_name`. Check how `Config` stores data.
     #[serde(skip)]
     pub target_name_index: usize,
 
     // This group of tags is used in the `activity_history` function.
     // This is used when the user wishes to create a new tag and assign it
     // to an activity that does not have a tag.
+    /// Determines whether the dialogue to change a tag will appear on screen.
     #[serde(skip)]
     pub show_tag_assign_window: bool,
+    /// The new tag the user creates.
     #[serde(skip)]
     pub new_tag: String,
+    /// The original tag to be changed
     #[serde(skip)]
     pub target_tag: String,
+    /// The index of `target_tag`
     #[serde(skip)]
     pub target_tag_index: usize,
+    /// UNUSED.
+    /// Boolean to determine whether to show the color picker on screen.
     #[serde(skip)]
     pub show_color_picker: bool,
 
     // Misc. Ungrouped fields that don't belong to a particular group.
+    /// Keeps track of which screen the user is currently on.
     #[serde(skip)]
     pub screen: Screen,
+    /// The message to display when there is an error of some sort.
     #[serde(skip)]
     pub warning: Option<String>,
 
-    /// Sunburst and visual distinction
+    /// Color for tags
     pub color: Color32,
+    /// Identifies which text box should be focused.
     #[serde(skip)]
     pub focus: bool,
 }
@@ -108,14 +130,17 @@ impl eframe::App for App {
 
 impl Default for App {
     fn default() -> Self {
+        // Gets the home directory (platform independent)
         let home = config_dir().unwrap();
         let home = format!("{}/actt", home.display());
-        // This is ok
+
+        // Creates the `actt` folder in the home directory if it doesn't exist.
         let home = Path::new(&home).to_owned();
         if !Path::try_exists(&home).unwrap() {
             fs::create_dir(&home).unwrap();
         }
 
+        // Creates a config file where data is stored.
         let config_file = format!("{}/actt.json", home.display());
         let config_file = Path::new(&config_file);
         if !Path::try_exists(config_file).unwrap() {
@@ -184,6 +209,8 @@ impl App {
             let lost_focus = r.lost_focus();
             let key_pressed = |key: egui::Key| ui.input().key_pressed(key);
 
+            // If the reason the focus is lost is due to the pressing of the enter
+            // key then apply the changes.
             if lost_focus && key_pressed(egui::Key::Enter) {
                 if !self.new_name.trim().is_empty() {
                     self.config.entry[index].name = self.new_name.clone();
@@ -224,6 +251,9 @@ impl App {
             });
 
             // TODO: Add a color picker.
+            // If the preference is "picker" then a window will pop up with a color wheel that
+            // allows them to select a new color for the tag.
+            // Since this doesn't work yet, it always defaults to a random color.
             if self.config.tag_assign_behavior() == "picker" {
                 todo!("Add a color picker!");
                 // Create a color picker right here.
@@ -277,7 +307,7 @@ impl App {
             .position(|tag| *tag == tag_to_delete)
             .expect("Tag not found, which *should* be impossible.");
 
-        // Each tag has a color associated with it, if tag is delete the
+        // Each tag has a color associated with it, if tag is deleted the
         // colors must be deleted along with it as well.
         self.config.tag_list.remove(del_index);
         self.config.colors.remove(del_index);
@@ -346,6 +376,7 @@ impl App {
         self.work_time = Duration::default();
     }
 
+    // TODO: This should be inside the config utilities module
     pub fn does_tag_exist(&self, tag_list: &[String], cur_tag: &String) -> bool {
         if tag_list.contains(cur_tag) {
             true

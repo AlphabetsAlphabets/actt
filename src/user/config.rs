@@ -19,10 +19,12 @@ pub struct Config {
     pub tag_list: Vec<String>,
     pub colors: Vec<Color32>,
 
+    /// Maybe this should be stored in its own file instead of instead of config?
     #[derivative(Default(value = "Preferences::default()"))]
     pub preferences: Preferences,
 }
 
+// TODO: Most of these should be in a utillities module honestly.
 impl Config {
     /// `value` can be either `"random"` or `"picker"`
     pub fn tag_assign_behavior(&self) -> &String {
