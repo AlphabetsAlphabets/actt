@@ -1,5 +1,5 @@
 use crate::app::App;
-use crate::user::{Entry, Config};
+use crate::user::{Config, Entry};
 
 use crate::constants::*;
 
@@ -287,27 +287,30 @@ fn activity_listing(
                         let button = Button::new(text).frame(false);
                         let r = ui.add(button);
 
-                        if !app.show_tag_assign_window {
-                            r.context_menu(|ui| {
-                                let btn_text = if tag_is_empty {
-                                    "Create tag"
-                                } else {
-                                    "Change tag"
-                                };
+                        r.context_menu(|ui| {
+                            if ui.button("Create tag").clicked() {
+                                app.show_create_tag_win = true;
+                                app.target_tag_index = index;
+                                ui.close_menu();
+                            }
+                        });
 
-                                if ui.button(btn_text).clicked() {
-                                    app.show_tag_assign_window = true;
-                                    app.target_tag_index = index;
-                                    ui.close_menu();
+                        if app.show_create_tag_win {
+                            egui::Window::new("").title_bar(false).show(ctx, |ui| {
+                                ui.heading("Create a new tag");
+                                ui.horizontal(|ui| {
+                                    ui.label("Tag name");
+                                    ui.text_edit_singleline(&mut app.new_tag);
+                                });
+
+                                if ui.button("Close").clicked() {
+                                    app.show_create_tag_win = false;
                                 }
                             });
                         }
-
-                        if app.show_tag_assign_window && index == app.target_tag_index {
-                            app.change_or_assign_tag(ctx, index, &colors);
-                        }
                     });
 
+                    // Time
                     let minutes = total_time / 60;
                     let seconds = total_time % 60;
                     let hours = minutes / 60;
@@ -315,7 +318,6 @@ fn activity_listing(
 
                     let total_time = format!("{}h {}m {}s", hours, minutes, seconds);
 
-                    // Total time
                     let time_btn = Button::new(total_time).frame(false);
                     column[2].vertical_centered_justified(|ui| ui.add(time_btn));
 

@@ -38,11 +38,11 @@ pub struct App {
     /// the entire run of the activity.
     #[serde(skip)]
     pub pause_time: Option<Instant>,
-    /// The amount of time passed when conducting the activity. 
+    /// The amount of time passed when conducting the activity.
     /// `total_time = pause_time + work_time`
     #[serde(skip)]
     pub total_time: Option<Instant>,
-    /// The amount of time the user is working on something.
+    /// The amount of time the user is worked on an activity.
     #[serde(skip)]
     pub work_time: Duration,
 
@@ -61,9 +61,20 @@ pub struct App {
     // This group of tags is used in the `activity_history` function.
     // This is used when the user wishes to create a new tag and assign it
     // to an activity that does not have a tag.
+    /// Check to see if a new tag needs to be created.
+    #[serde(skip)]
+    pub create_tag: bool,
+    /// Check to see if the user wants to switch to a new tag.
+    /// Determines whether the dialogue to create a tag will appear on screen.
+    #[serde(skip)]
+    pub show_create_tag_win: bool,
+
+    #[serde(skip)]
+    pub change_tag: bool,
     /// Determines whether the dialogue to change a tag will appear on screen.
     #[serde(skip)]
-    pub show_tag_assign_window: bool,
+    pub show_change_tag_win: bool,
+
     /// The new tag the user creates.
     #[serde(skip)]
     pub new_tag: String,
@@ -164,7 +175,12 @@ impl Default for App {
             new_name: "".to_string(),
             target_name_index: usize::MAX,
 
-            show_tag_assign_window: false,
+            create_tag: false,
+            show_create_tag_win: false,
+
+            change_tag: false,
+            show_change_tag_win: false,
+
             target_tag: "".to_string(),
             target_tag_index: 0,
             new_tag: "".to_string(),
@@ -233,6 +249,37 @@ impl App {
         }
     }
 
+    pub fn create_tag(&mut self, index: usize, list_of_colors: &[Color32]) {
+        let mut config_file = self.read_config_file();
+        if config_file.tag_list.contains(&self.new_tag) {
+            // FIXME:
+            // This is wrong. A user can rename a tag to be the same one, because they
+            // could have clicked on the wrong tag. Instead find the same color and return
+            // early.
+            todo!("Warn user that tag exists, choose another one. Create some update in the UI.");
+        }
+
+        config_file.tag_list.push(self.new_tag.clone());
+        self.color = self.config.random_color(&list_of_colors, &self.color, None);
+        config_file.colors.push(self.color.clone());
+
+        if let Some(entry) = config_file.entry.get_mut(index) {
+            entry.tag_index = config_file.tag_list.len() - 1;
+            entry.color_index = config_file.colors.len() - 1;
+        }
+
+        self.config = config_file;
+        self.write_config_file();
+
+        if self.config_file_updated {
+            self.show_create_tag_win = false;
+        }
+    }
+
+    /// Changes the existing tag to a current one.
+    pub fn change_tag(&mut self, ctx: &Context, index: usize, list_of_colors: &[Color32]) {
+    }
+
     /// The user can change or assign new tags based on the the cirumstance.
     pub fn change_or_assign_tag(
         &mut self,
@@ -254,12 +301,7 @@ impl App {
             // If the preference is "picker" then a window will pop up with a color wheel that
             // allows them to select a new color for the tag.
             // Since this doesn't work yet, it always defaults to a random color.
-            if self.config.tag_assign_behavior() == "picker" {
-                todo!("Add a color picker!");
-                // Create a color picker right here.
-            } else {
-                self.color = self.config.random_color(&list_of_colors, &self.color, None);
-            }
+            self.color = self.config.random_color(&list_of_colors, &self.color, None);
 
             ui.vertical_centered(|ui| {
                 let done_btn = ui.button("Done");
@@ -267,6 +309,7 @@ impl App {
                     return;
                 }
 
+                // The user wants to decide the tag later.
                 if self.new_tag.is_empty() {
                     return;
                 }
@@ -293,7 +336,7 @@ impl App {
                 self.write_config_file();
 
                 if self.config_file_updated {
-                    self.show_tag_assign_window = false;
+                    self.show_create_tag_win = false;
                 }
             });
         });
