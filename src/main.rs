@@ -1,14 +1,11 @@
 // This is used to hide the console from popping up on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-#![feature(drain_filter)]
 
-pub mod app;
+mod app;
+mod constants;
+mod screens;
+
 use app::App;
-
-pub mod user;
-pub mod screens;
-pub mod constants;
-
 use eframe;
 
 // When compiling natively:
@@ -21,7 +18,7 @@ fn main() {
         ..Default::default()
     };
 
-    eframe::run_native(
+    let _ = eframe::run_native(
         "Actt",
         native_options,
         Box::new(|cc| Box::new(App::new(cc))),
