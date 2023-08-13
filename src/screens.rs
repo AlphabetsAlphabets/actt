@@ -8,6 +8,12 @@ pub enum Screen {
     Tracking,
 }
 
+impl Default for Screen {
+    fn default() -> Self {
+        Self::Start
+    }
+}
+
 impl App {
     pub fn horizontal_menu(&mut self, ui: &mut Ui) {
         ui.horizontal_top(|ui| {

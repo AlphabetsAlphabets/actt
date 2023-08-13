@@ -2,10 +2,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app;
-mod constants;
 mod screens;
 
 use app::App;
+
 use eframe;
 
 // When compiling natively:
@@ -21,6 +21,6 @@ fn main() {
     let _ = eframe::run_native(
         "Actt",
         native_options,
-        Box::new(|cc| Box::new(App::new(cc))),
+        Box::new(|_cc| Box::<App>::default()),
     );
 }
