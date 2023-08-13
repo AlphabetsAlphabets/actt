@@ -5,7 +5,6 @@ use crate::constants::*;
 
 use std::time::Instant;
 
-use egui::Response;
 use egui::{
     color_picker::{color_picker_color32, Alpha},
     Button, Color32, RichText, ScrollArea, Ui, Vec2,

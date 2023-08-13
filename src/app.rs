@@ -35,7 +35,6 @@ pub struct App {
     #[serde(skip)]
     pub config: Config,
 
-    /// UNUSED. TODO.
     /// A tally of how long the user paused an activity throughout the
     /// entire run of the activity.
     #[serde(skip)]
