@@ -10,6 +10,7 @@ pub struct App {
     pub tag_name: String,
 
     pub screen: Screen,
+    pub selected: Enum,
 }
 
 impl eframe::App for App {

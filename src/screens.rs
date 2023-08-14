@@ -1,6 +1,33 @@
+use std::fmt::Debug;
+
 use crate::app::App;
 
-use egui::{Ui, Vec2};
+use egui::{ComboBox, Ui, Vec2};
+
+#[derive(PartialEq)]
+pub enum Enum {
+    First,
+    Second,
+    Third,
+}
+
+impl Default for Enum {
+    fn default() -> Self {
+        Self::First
+    }
+}
+
+impl Debug for Enum {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let msg = match self {
+            Self::First => "First",
+            Self::Second => "Second",
+            Self::Third => "Third",
+        };
+
+        write!(f, "{:?}", msg)
+    }
+}
 
 #[derive(PartialEq)]
 pub enum Screen {
@@ -49,7 +76,15 @@ impl App {
                         // Tag column
                         ui.columns(2, |column| {
                             column[0].vertical_centered_justified(|ui| ui.label("Tag"));
-                            column[1].vertical_centered_justified(|ui| {});
+                            column[1].vertical_centered_justified(|ui| {
+                                ComboBox::from_label("")
+                                    .selected_text(format!("{:?}", self.selected))
+                                    .show_ui(ui, |ui| {
+                                        ui.selectable_value(&mut self.selected, Enum::First, "First");
+                                        ui.selectable_value(&mut self.selected, Enum::Second, "Second");
+                                        ui.selectable_value(&mut self.selected, Enum::Third, "Third");
+                                    });
+                            });
                         });
 
                         // Color column
